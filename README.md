@@ -11,6 +11,8 @@ Plain PHP templates, no JS bundle, no database: it reads
 `runtime/debug/<date>/<request-id>/*.json`. That matters when the thing you
 are debugging is the asset build.
 
+Source: <https://github.com/donairl/yii3-debug-viewer>
+
 ## What it shows
 
 Index: collected requests newest first with method, path, status, SQL count,
@@ -23,12 +25,21 @@ the raw collector summary.
 
 ## Install
 
-From a Git remote:
+The package is not on Packagist, so declare the GitHub repository first, then
+require it:
+
+```bash
+composer config repositories.yii3-debug-viewer vcs https://github.com/donairl/yii3-debug-viewer.git
+composer require --dev dxn/yii3-debug-viewer:dev-main
+```
+
+The equivalent `composer.json` edit, if you prefer editing by hand — run
+`composer update dxn/yii3-debug-viewer` afterwards:
 
 ```json
 {
     "repositories": [
-        { "type": "vcs", "url": "https://gitea.dxn2u.net/donny/yii3-debug-viewer.git" }
+        { "type": "vcs", "url": "https://github.com/donairl/yii3-debug-viewer.git" }
     ],
     "require-dev": { "dxn/yii3-debug-viewer": "dev-main" }
 }
@@ -84,3 +95,31 @@ Keep the viewer's own requests out of the dumps:
 A Yii 3 application with `yiisoft/config`, `yiisoft/router` 4,
 `yiisoft/aliases`, a PSR-17 response factory, and `yiisoft/yii-debug`
 collecting to `@runtime/debug`.
+
+## Working on the package itself
+
+Clone and install the dev dependencies:
+
+```bash
+git clone https://github.com/donairl/yii3-debug-viewer.git
+cd yii3-debug-viewer
+composer install
+```
+
+`composer install` reads `composer.lock` when one is present and installs the
+exact pinned versions; without a lock file it resolves `composer.json` and
+writes one. Use it after cloning and after every `git pull`. Useful flags:
+
+```bash
+composer install --no-dev                  # runtime deps only, for deployment
+composer install --no-interaction --prefer-dist   # CI
+composer update                            # re-resolve and rewrite composer.lock
+composer dump-autoload                      # regenerate the autoloader only
+```
+
+Static analysis:
+
+```bash
+composer install
+vendor/bin/psalm
+```

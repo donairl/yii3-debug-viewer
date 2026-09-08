@@ -3,6 +3,11 @@
     "description": "Server-rendered viewer for the request dumps written by yiisoft/yii-debug",
     "type": "library",
     "license": "proprietary",
+    "homepage": "https://github.com/donairl/yii3-debug-viewer",
+    "support": {
+        "issues": "https://github.com/donairl/yii3-debug-viewer/issues",
+        "source": "https://github.com/donairl/yii3-debug-viewer"
+    },
     "require": {
         "php": ">=8.2",
         "psr/http-message": "^2.0",
