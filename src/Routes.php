@@ -31,7 +31,9 @@ final class Routes
         $prefix = '/' . trim($prefix, '/');
 
         return [
-            Route::get($prefix)
+            // Optional trailing slash: a webserver or upstream rule can shadow
+            // the exact path while letting "<prefix>/" through, and vice versa.
+            Route::get($prefix . '[/]')
                 ->action(IndexAction::class)
                 ->name('debug.index'),
             Route::get($prefix . '/{id:[A-Za-z0-9]+}')
