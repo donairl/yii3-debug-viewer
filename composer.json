@@ -1,0 +1,43 @@
+{
+    "name": "dxn/yii3-debug-viewer",
+    "description": "Server-rendered viewer for the request dumps written by yiisoft/yii-debug",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "psr/http-message": "^2.0",
+        "psr/http-factory": "^1.1",
+        "yiisoft/aliases": "^3.0",
+        "yiisoft/router": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dxn\\DebugViewer\\": "src"
+        }
+    },
+    "extra": {
+        "config-plugin": {
+            "params": "config/params.php",
+            "di-web": "config/di-web.php"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/config": true
+        }
+    },
+    "keywords": [
+        "yii3",
+        "debug",
+        "viewer",
+        "yii-debug"
+    ],
+    "require-dev": {
+        "vimeo/psalm": "^6.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dxn\\DebugViewer\\Tests\\": "tests"
+        }
+    }
+}
