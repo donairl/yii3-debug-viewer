@@ -54,6 +54,22 @@ $timeline = $view->timeline();
 /** Short, single-line form of a statement for headings. */
 $shorten = static fn(string $text, int $max = 140): string => mb_strimwidth((string)preg_replace('/\s+/', ' ', $text), 0, $max, '…');
 
+/** Queries slower than this get the "slow" filter flag (and the amber timing badge). */
+$slowQueryMs = 20.0;
+
+/** Search box shared by the per-tab filter bars. Wired up by the script at the bottom. */
+$filterSearch = static function (string $placeholder): void {
+    ?>
+    <div class="flt-search">
+        <input type="text" class="flt-input" placeholder="<?= Template::e($placeholder) ?>" autocomplete="off" spellcheck="false">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+    </div>
+    <?php
+};
+
 /** A location as text, wrapped in an open-in-editor link when the editor is configured and the path is absolute. */
 $linkTo = static function (string $text, ?string $url): string {
     if ($url === null) {
@@ -316,6 +332,39 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         color: var(--c-warn);
         border-color: var(--c-warn-border);
     }
+
+    /* Per-tab filter bars */
+    .flt { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .flt-search { position: relative; }
+    .flt-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+    .flt-input, .flt-select {
+        background: var(--bg-input);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        font-size: 12.5px;
+        outline: none;
+        transition: var(--transition);
+    }
+    .flt-input { padding: 0.38rem 0.75rem 0.38rem 2rem; width: 250px; }
+    .flt-input:focus, .flt-select:focus { border-color: var(--accent); }
+    .flt-select { padding: 0.38rem 0.65rem; color: var(--text-secondary); cursor: pointer; }
+    .flt-toggle, .flt-clear {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-surface);
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+    .flt-toggle.on { background: var(--c-warn-bg); color: var(--c-warn); border-color: var(--c-warn-border); font-weight: 600; }
+    .flt-clear { background: transparent; border-style: dashed; }
+    .flt-clear[hidden], .flt-empty[hidden] { display: none; }
+    .flt-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); }
+    .flt-empty { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 13px; }
 
     .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
     .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
@@ -737,6 +786,23 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 (Total execution time: <?= Template::e(Template::formatMs($totalQueryDuration)) ?>)
             </span>
         </div>
+
+        <?php if ($queries !== []) { ?>
+            <div class="flt" data-flt="sql">
+                <?php $filterSearch('Filter SQL, params, caller… ( / )'); ?>
+                <select class="flt-select" data-flt-key="status" aria-label="Query status">
+                    <option value="">All status</option>
+                    <option value="success">Success</option>
+                    <option value="error">Failed</option>
+                </select>
+                <button type="button" class="flt-toggle" data-flt-key="slow" title="Queries slower than <?= (int)$slowQueryMs ?> ms">Slow &gt;<?= (int)$slowQueryMs ?> ms</button>
+                <?php if ($queryFlags !== []) { ?>
+                    <button type="button" class="flt-toggle" data-flt-key="flagged" title="N+1 and duplicate queries">N+1 / duplicate</button>
+                <?php } ?>
+                <span class="flt-count"></span>
+                <button type="button" class="flt-clear" hidden>Clear</button>
+            </div>
+        <?php } ?>
     </div>
 
     <?php if ($insights['groups'] !== []) { ?>
@@ -750,14 +816,18 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
             <p style="color: var(--text-muted);">No database queries were executed during this request.</p>
         </div>
     <?php } else { ?>
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div style="display: flex; flex-direction: column; gap: 1rem;" data-flt-scope="sql">
             <?php foreach ($queries as $i => $query) { ?>
                 <?php
                 $qDur = $query['durationMs'];
                 $qSql = (string)$query['sql'];
                 $qFlag = $queryFlags[$i] ?? null;
                 ?>
-                <div class="dash-panel<?= $qFlag !== null ? ' query-flagged' : '' ?>" id="q-<?= $i ?>">
+                <div class="dash-panel<?= $qFlag !== null ? ' query-flagged' : '' ?>" id="q-<?= $i ?>"
+                     data-flt-item
+                     data-status="<?= $query['status'] === 'success' ? 'success' : 'error' ?>"
+                     data-slow="<?= $qDur !== null && $qDur > $slowQueryMs ? '1' : '0' ?>"
+                     data-flagged="<?= $qFlag !== null ? '1' : '0' ?>">
                     <div class="dash-panel-header" style="padding: 0.65rem 1rem;">
                         <div style="display: flex; align-items: center; gap: 0.6rem;">
                             <span style="font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: var(--text-muted);">
@@ -794,7 +864,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         </div>
                     </div>
 
-                    <div style="padding: 1rem;">
+                    <div style="padding: 1rem;" data-flt-text>
                         <pre style="margin: 0; background: var(--code-bg);"><?= DumpView::highlightSql($qSql) ?></pre>
 
                         <?php if (!empty($query['params'])) { ?>
@@ -826,6 +896,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     </div>
                 </div>
             <?php } ?>
+            <div class="flt-empty" hidden>No queries match the current filters.</div>
         </div>
     <?php } ?>
 </div>
@@ -915,6 +986,31 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <span>Application Log Entries</span>
                 <span class="dash-badge"><?= count($logs) ?></span>
             </div>
+
+            <?php if ($logs !== []) { ?>
+                <?php
+                $levelCounts = [];
+                foreach ($logs as $l) {
+                    $levelCounts[strtolower($l['level'])] = ($levelCounts[strtolower($l['level'])] ?? 0) + 1;
+                }
+                $severity = array_flip(['emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug']);
+                uksort($levelCounts, static fn(string $a, string $b): int => ($severity[$a] ?? 99) <=> ($severity[$b] ?? 99) ?: strcmp($a, $b));
+                $withContext = count(array_filter($logs, static fn(array $l): bool => $l['context'] !== null));
+                ?>
+                <div class="flt" data-flt="logs">
+                    <?php $filterSearch('Filter message, context, caller… ( / )'); ?>
+                    <?php foreach ($levelCounts as $lvlName => $n) { ?>
+                        <button type="button" class="tl-chip" data-flt-chip="level" data-flt-value="<?= Template::e($lvlName) ?>" title="Show or hide <?= Template::e($lvlName) ?> entries">
+                            <?= Template::e($lvlName) ?> <span class="font-mono"><?= (int)$n ?></span>
+                        </button>
+                    <?php } ?>
+                    <?php if ($withContext > 0 && $withContext < count($logs)) { ?>
+                        <button type="button" class="flt-toggle" data-flt-key="context">Has context</button>
+                    <?php } ?>
+                    <span class="flt-count"></span>
+                    <button type="button" class="flt-clear" hidden>Clear</button>
+                </div>
+            <?php } ?>
         </div>
 
         <?php if ($logs === []) { ?>
@@ -922,7 +1018,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 No application messages were logged for this request.
             </div>
         <?php } else { ?>
-            <div class="dash-table-container">
+            <div class="dash-table-container" data-flt-scope="logs">
                 <table class="dash-table">
                     <thead>
                         <tr>
@@ -938,7 +1034,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                             $isErr = in_array($lvl, ['error', 'critical', 'alert', 'emergency'], true);
                             $isWarn = ($lvl === 'warning');
                             ?>
-                            <tr>
+                            <tr data-flt-item data-level="<?= Template::e($lvl) ?>" data-context="<?= $log['context'] !== null ? '1' : '0' ?>">
                                 <td>
                                     <span class="dash-badge <?= $isErr ? 'badge-danger' : ($isWarn ? 'badge-warning' : '') ?>" style="text-transform: uppercase;">
                                         <?= Template::e($lvl) ?>
@@ -1219,6 +1315,20 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <span>Dispatched Application Events</span>
                 <span class="dash-badge"><?= count($events) ?></span>
             </div>
+
+            <?php if ($events !== []) { ?>
+                <?php
+                $vendorEvents = count(array_filter($events, static fn(array $e): bool => ExceptionTrace::isVendor($e['file'])));
+                ?>
+                <div class="flt" data-flt="events">
+                    <?php $filterSearch('Filter event name or location… ( / )'); ?>
+                    <?php if ($vendorEvents > 0 && $vendorEvents < count($events)) { ?>
+                        <button type="button" class="flt-toggle" data-flt-key="app" title="Hide events declared in vendor/ (<?= $vendorEvents ?>)">App events only</button>
+                    <?php } ?>
+                    <span class="flt-count"></span>
+                    <button type="button" class="flt-clear" hidden>Clear</button>
+                </div>
+            <?php } ?>
         </div>
 
         <?php if ($events === []) { ?>
@@ -1226,7 +1336,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 No events recorded.
             </div>
         <?php } else { ?>
-            <div class="dash-table-container">
+            <div class="dash-table-container" data-flt-scope="events">
                 <table class="dash-table">
                     <thead>
                         <tr>
@@ -1237,7 +1347,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     </thead>
                     <tbody>
                         <?php foreach ($events as $idx => $ev) { ?>
-                            <tr>
+                            <tr data-flt-item data-app="<?= ExceptionTrace::isVendor($ev['file']) ? '0' : '1' ?>">
                                 <td class="text-muted font-mono"><?= $idx + 1 ?></td>
                                 <td style="font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text-primary);">
                                     <?= Template::e($ev['name']) ?>
@@ -1349,7 +1459,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         });
 
         // Timeline type filter
-        document.querySelectorAll('.tl-chip').forEach(function(chip) {
+        document.querySelectorAll('.tl-chip[data-tl-type]').forEach(function(chip) {
             chip.addEventListener('click', function() {
                 this.classList.toggle('off');
                 var hidden = {};
@@ -1360,6 +1470,111 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     row.style.display = hidden[row.getAttribute('data-type')] ? 'none' : '';
                 });
             });
+        });
+
+        // Per-tab filters (SQL, logs, events). Each bar `data-flt="x"` filters the
+        // `data-flt-item` elements inside `data-flt-scope="x"`:
+        //   .flt-input               space-separated terms, all must appear in the item's text
+        //   .flt-select[data-flt-key]  item's data-<key> must equal the chosen value
+        //   .flt-toggle[data-flt-key]  when on, item's data-<key> must be "1"
+        //   [data-flt-chip][data-flt-value]  turned off, hides items whose data-<chip> is that value
+        document.querySelectorAll('.flt[data-flt]').forEach(function(bar) {
+            var scope = document.querySelector('[data-flt-scope="' + bar.getAttribute('data-flt') + '"]');
+            if (!scope) { return; }
+
+            var items = Array.prototype.slice.call(scope.querySelectorAll('[data-flt-item]'));
+            var input = bar.querySelector('.flt-input');
+            var selects = bar.querySelectorAll('.flt-select');
+            var toggles = bar.querySelectorAll('.flt-toggle');
+            var chips = bar.querySelectorAll('[data-flt-chip]');
+            var count = bar.querySelector('.flt-count');
+            var clear = bar.querySelector('.flt-clear');
+            var empty = scope.querySelector('.flt-empty');
+            if (!empty) {
+                empty = document.createElement('div');
+                empty.className = 'flt-empty';
+                empty.hidden = true;
+                empty.textContent = 'Nothing matches the current filters.';
+                scope.appendChild(empty);
+            }
+
+            var haystacks = null;
+            function haystack(i) {
+                if (!haystacks) {
+                    haystacks = items.map(function(el) {
+                        var part = el.querySelector('[data-flt-text]') || el;
+                        return part.textContent.toLowerCase();
+                    });
+                }
+                return haystacks[i];
+            }
+
+            function apply() {
+                var terms = (input ? input.value : '').toLowerCase().split(/\s+/).filter(Boolean);
+                var sel = {}, on = {}, off = {}, k;
+                selects.forEach(function(s) { if (s.value) { sel[s.getAttribute('data-flt-key')] = s.value; } });
+                toggles.forEach(function(t) { if (t.classList.contains('on')) { on[t.getAttribute('data-flt-key')] = true; } });
+                chips.forEach(function(c) {
+                    if (c.classList.contains('off')) {
+                        var key = c.getAttribute('data-flt-chip');
+                        (off[key] = off[key] || {})[c.getAttribute('data-flt-value')] = true;
+                    }
+                });
+
+                var visible = 0;
+                items.forEach(function(el, i) {
+                    var ok = true;
+                    for (k in sel) { if (el.getAttribute('data-' + k) !== sel[k]) { ok = false; } }
+                    for (k in on) { if (el.getAttribute('data-' + k) !== '1') { ok = false; } }
+                    for (k in off) { if (off[k][el.getAttribute('data-' + k)]) { ok = false; } }
+                    if (ok && terms.length) {
+                        var h = haystack(i);
+                        ok = terms.every(function(t) { return h.indexOf(t) !== -1; });
+                    }
+                    el.style.display = ok ? '' : 'none';
+                    if (ok) { visible++; }
+                });
+
+                var active = terms.length > 0 || Object.keys(sel).length > 0 || Object.keys(on).length > 0 || Object.keys(off).length > 0;
+                if (count) { count.textContent = active ? visible + ' of ' + items.length : ''; }
+                if (clear) { clear.hidden = !active; }
+                empty.hidden = !(active && visible === 0);
+            }
+
+            if (input) {
+                input.addEventListener('input', apply);
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') { this.value = ''; this.blur(); apply(); }
+                });
+            }
+            selects.forEach(function(s) { s.addEventListener('change', apply); });
+            toggles.forEach(function(t) {
+                t.addEventListener('click', function() { this.classList.toggle('on'); apply(); });
+            });
+            chips.forEach(function(c) {
+                c.addEventListener('click', function() { this.classList.toggle('off'); apply(); });
+            });
+            if (clear) {
+                clear.addEventListener('click', function() {
+                    if (input) { input.value = ''; }
+                    selects.forEach(function(s) { s.value = ''; });
+                    toggles.forEach(function(t) { t.classList.remove('on'); });
+                    chips.forEach(function(c) { c.classList.remove('off'); });
+                    apply();
+                });
+            }
+        });
+
+        // '/' focuses the filter box of the tab you are looking at
+        window.addEventListener('keydown', function(e) {
+            if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) { return; }
+            if (['INPUT', 'TEXTAREA', 'SELECT'].indexOf(document.activeElement.tagName) !== -1) { return; }
+            var box = document.querySelector('.dash-tab-pane.active .flt-input');
+            if (box) {
+                e.preventDefault();
+                box.focus();
+                box.select();
+            }
         });
 
         // Raw collector switcher

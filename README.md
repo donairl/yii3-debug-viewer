@@ -30,6 +30,12 @@ the raw collector summary. On top of that:
   different values) and duplicate queries (identical statement and values
   run again) are flagged on the Overview and Database tabs, with the time
   that could be saved and the calling line.
+- **Filters.** The Database, Logs and Events tabs each have a filter bar.
+  Search takes several words (all must match) and press `/` to focus it,
+  `Esc` to clear. Database: status, slow queries (>20 ms), N+1/duplicate
+  only. Logs: toggle levels on and off, entries with context only. Events:
+  hide events declared in `vendor/`. Filtering is in the browser, so it
+  needs no extra request.
 - **Timeline.** SQL, container services, events, log entries and exceptions
   on one time axis. Filter by type; click a query to jump to it. Services
   faster than 0.5 ms are counted, not listed.
