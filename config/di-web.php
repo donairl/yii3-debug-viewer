@@ -37,6 +37,7 @@ return [
         'class' => IndexAction::class,
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
+            'listLimit' => max(1, (int)($config['listLimit'] ?? 100)),
         ],
     ],
 

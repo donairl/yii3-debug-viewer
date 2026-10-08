@@ -19,6 +19,15 @@ Index: collected requests newest first with method, path, status, SQL count,
 log count, error count, duration and peak memory. Reads only `summary.json`,
 so it stays fast with many dumps.
 
+The list filters in the browser: search over path, route name, action and
+status (several words must all match), method, status class, errors only,
+slow (>500 ms), a minimum query count and a time range. Click a column
+header to sort by it (click again to reverse, a third time to reset). The
+filter and sort state is kept in the URL, for example
+`/debug?err=1&minq=20&sort=duration&dir=desc`, so a filtered view can be
+bookmarked or shared. Filters apply to the newest `listLimit` dumps (100 by
+default), and the page says so when the limit is reached.
+
 Detail: SQL queries with parameters substituted and the calling `file:line`,
 log entries by level, exceptions, matched route, request/response, events and
 the raw collector summary. On top of that:

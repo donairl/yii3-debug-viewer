@@ -17,6 +17,7 @@ final readonly class IndexAction
         private Template $template,
         private UrlGeneratorInterface $urlGenerator,
         private bool $enabled = false,
+        private int $listLimit = 100,
     ) {}
 
     public function __invoke(): ResponseInterface
@@ -28,7 +29,8 @@ final readonly class IndexAction
         return $this->template->html('index', [
             'title' => 'Debug requests',
             'indexUrl' => $this->urlGenerator->generate('debug.index'),
-            'rows' => $this->storage->list(),
+            'rows' => $this->storage->list($this->listLimit),
+            'limit' => $this->listLimit,
             'viewUrl' => fn(string $id): string => $this->urlGenerator->generate('debug.view', ['id' => $id]),
         ]);
     }

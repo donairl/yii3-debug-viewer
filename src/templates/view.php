@@ -333,39 +333,6 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         border-color: var(--c-warn-border);
     }
 
-    /* Per-tab filter bars */
-    .flt { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-    .flt-search { position: relative; }
-    .flt-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-    .flt-input, .flt-select {
-        background: var(--bg-input);
-        border: 1px solid var(--border-subtle);
-        border-radius: var(--radius-sm);
-        color: var(--text-primary);
-        font-family: var(--font-sans);
-        font-size: 12.5px;
-        outline: none;
-        transition: var(--transition);
-    }
-    .flt-input { padding: 0.38rem 0.75rem 0.38rem 2rem; width: 250px; }
-    .flt-input:focus, .flt-select:focus { border-color: var(--accent); }
-    .flt-select { padding: 0.38rem 0.65rem; color: var(--text-secondary); cursor: pointer; }
-    .flt-toggle, .flt-clear {
-        font-family: var(--font-sans);
-        font-size: 12px;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        border: 1px solid var(--border-subtle);
-        background: var(--bg-surface);
-        color: var(--text-secondary);
-        cursor: pointer;
-    }
-    .flt-toggle.on { background: var(--c-warn-bg); color: var(--c-warn); border-color: var(--c-warn-border); font-weight: 600; }
-    .flt-clear { background: transparent; border-style: dashed; }
-    .flt-clear[hidden], .flt-empty[hidden] { display: none; }
-    .flt-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); }
-    .flt-empty { padding: 2rem; text-align: center; color: var(--text-muted); font-size: 13px; }
-
     .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
     .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 

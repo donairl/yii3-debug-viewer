@@ -7,7 +7,10 @@ use Dxn\DebugViewer\Template;
 /**
  * @var list<array<string, mixed>> $rows
  * @var Closure(string): string $viewUrl
+ * @var int $limit
  */
+
+$listLimit = (int)($limit ?? 100);
 
 // Calculate overview dashboard metrics
 $totalRequests = count($rows);
@@ -121,7 +124,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                 <input 
                     type="text" 
                     id="req-search" 
-                    placeholder="Filter path, method, status... ( / )" 
+                    placeholder="Path, route, status… ( / )" 
                     style="background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); padding: 0.38rem 0.75rem 0.38rem 2rem; font-size: 12.5px; width: 240px; outline: none; transition: var(--transition);"
                     onfocus="this.style.borderColor='var(--accent)'; this.style.width='300px';"
                     onblur="this.style.borderColor='var(--border-subtle)'; if(!this.value) this.style.width='240px';"
@@ -168,18 +171,35 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
             </div>
         </div>
     <?php } else { ?>
+        <div class="flt flt-bar" id="idx-filters">
+            <button type="button" class="flt-toggle" id="f-errors" title="Requests with an exception or a failed query">Errors only</button>
+            <button type="button" class="flt-toggle" id="f-slow" title="Requests slower than 500 ms">Slow &gt;500 ms</button>
+            <input type="number" min="0" step="1" class="flt-input flt-num" id="f-minq" placeholder="Queries ≥" aria-label="Minimum number of queries">
+            <select class="flt-select" id="f-since" aria-label="Time range">
+                <option value="">Any time</option>
+                <option value="300">Last 5 minutes</option>
+                <option value="3600">Last hour</option>
+                <option value="86400">Last 24 hours</option>
+            </select>
+            <span class="flt-count" id="f-count"></span>
+            <button type="button" class="flt-clear" id="f-clear" hidden>Clear</button>
+            <?php if ($totalRequests >= $listLimit) { ?>
+                <span class="text-muted" style="font-size: 11.5px; margin-left: auto;">Newest <?= (int)$listLimit ?> dumps loaded, filters apply to these (<code>listLimit</code>).</span>
+            <?php } ?>
+        </div>
+
         <div class="dash-table-container">
-            <table class="dash-table" id="requests-table">
+            <table class="dash-table" id="requests-table" data-now="<?= time() ?>">
                 <thead>
                     <tr>
-                        <th style="width: 85px;">Time</th>
-                        <th style="width: 75px;">Method</th>
-                        <th style="width: 100px;">Status</th>
-                        <th>Path & Action</th>
-                        <th style="text-align: right; width: 90px;">Queries</th>
-                        <th style="text-align: right; width: 85px;">Logs</th>
-                        <th style="text-align: right; width: 100px;">Duration</th>
-                        <th style="text-align: right; width: 95px;">Memory</th>
+                        <th style="width: 85px;" data-sort="time" data-sort-first="desc">Time</th>
+                        <th style="width: 75px;" data-sort="method" data-sort-first="asc">Method</th>
+                        <th style="width: 100px;" data-sort="status" data-sort-first="desc">Status</th>
+                        <th data-sort="path" data-sort-first="asc">Path & Action</th>
+                        <th style="text-align: right; width: 90px;" data-sort="queries" data-sort-first="desc">Queries</th>
+                        <th style="text-align: right; width: 85px;" data-sort="logs" data-sort-first="desc">Logs</th>
+                        <th style="text-align: right; width: 100px;" data-sort="duration" data-sort-first="desc">Duration</th>
+                        <th style="text-align: right; width: 95px;" data-sort="memory" data-sort-first="desc">Memory</th>
                         <th style="text-align: center; width: 75px;">Details</th>
                     </tr>
                 </thead>
@@ -201,6 +221,13 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             data-status="<?= Template::e($status) ?>"
                             data-path="<?= Template::e(strtolower($path)) ?>"
                             data-action="<?= Template::e(strtolower($action)) ?>"
+                            data-route="<?= Template::e(strtolower((string)($row['routeName'] ?? ''))) ?>"
+                            data-problems="<?= $problems ?>"
+                            data-queries="<?= (int)$row['queries'] ?>"
+                            data-logs="<?= (int)$row['logs'] ?>"
+                            data-duration="<?= Template::e(round($dur, 3)) ?>"
+                            data-memory="<?= Template::e(round((float)$row['memoryMb'], 3)) ?>"
+                            data-time="<?= (int)$row['time'] ?>"
                             style="cursor: pointer;"
                             onclick="if(!event.target.closest('a, button, .copy-btn')) window.location='<?= Template::e($targetUrl) ?>'"
                         >
@@ -301,6 +328,9 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             </td>
                         </tr>
                     <?php } ?>
+                    <tr class="idx-empty" hidden>
+                        <td colspan="9" style="padding: 2.5rem; text-align: center; color: var(--text-muted);">No requests match the current filters.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -308,68 +338,197 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
 </div>
 
 <script>
-    // Live filter and search implementation
+    // Request list: filters, sorting and deep links. State lives in the query string
+    // (?q=&method=&status=&err=1&slow=1&minq=&since=&sort=&dir=) so a filtered view can be bookmarked or shared.
     (function() {
-        var searchInput = document.getElementById('req-search');
-        var methodFilter = document.getElementById('method-filter');
-        var statusFilter = document.getElementById('status-filter');
-        var countBadge = document.getElementById('visible-count');
-        var rows = document.querySelectorAll('.request-row');
+        var table = document.getElementById('requests-table');
+        if (!table) { return; }
 
-        function applyFilter() {
-            var q = (searchInput ? searchInput.value : '').toLowerCase().trim();
-            var method = methodFilter ? methodFilter.value : 'ALL';
-            var statusGroup = statusFilter ? statusFilter.value : 'ALL';
+        var tbody = table.tBodies[0];
+        var rows = Array.prototype.slice.call(tbody.querySelectorAll('.request-row'));
+        var emptyRow = tbody.querySelector('.idx-empty');
+        var heads = table.querySelectorAll('th[data-sort]');
+        var ctl = {
+            q: document.getElementById('req-search'),
+            method: document.getElementById('method-filter'),
+            status: document.getElementById('status-filter'),
+            since: document.getElementById('f-since'),
+            minq: document.getElementById('f-minq'),
+            err: document.getElementById('f-errors'),
+            slow: document.getElementById('f-slow')
+        };
+        var countBadge = document.getElementById('visible-count');
+        var countText = document.getElementById('f-count');
+        var clearBtn = document.getElementById('f-clear');
+
+        var serverNow = parseInt(table.getAttribute('data-now') || '0', 10);
+        var loadedAt = Date.now();
+        var sort = { key: '', dir: '' };
+
+        rows.forEach(function(row, i) {
+            row._i = i;
+            row._text = [
+                row.getAttribute('data-path'), row.getAttribute('data-action'), row.getAttribute('data-route'),
+                (row.getAttribute('data-method') || '').toLowerCase(), row.getAttribute('data-status')
+            ].join(' ');
+        });
+
+        function num(row, attr) { return parseFloat(row.getAttribute('data-' + attr) || '0') || 0; }
+
+        function statusMatches(group, status) {
+            if (group === '2XX') { return status >= 200 && status < 300; }
+            if (group === '3XX') { return status >= 300 && status < 400; }
+            if (group === '4XX') { return status >= 400 && status < 500; }
+            if (group === '5XX') { return status >= 500; }
+            return true;
+        }
+
+        function readUrl() {
+            var p = new URLSearchParams(window.location.search);
+            if (ctl.q) { ctl.q.value = p.get('q') || ''; }
+            if (ctl.method) { ctl.method.value = p.get('method') || 'ALL'; if (!ctl.method.value) { ctl.method.value = 'ALL'; } }
+            if (ctl.status) { ctl.status.value = p.get('status') || 'ALL'; if (!ctl.status.value) { ctl.status.value = 'ALL'; } }
+            if (ctl.since) { ctl.since.value = p.get('since') || ''; }
+            if (ctl.minq) { ctl.minq.value = /^\d+$/.test(p.get('minq') || '') ? p.get('minq') : ''; }
+            if (ctl.err) { ctl.err.classList.toggle('on', p.get('err') === '1'); }
+            if (ctl.slow) { ctl.slow.classList.toggle('on', p.get('slow') === '1'); }
+
+            var key = p.get('sort') || '';
+            var valid = Array.prototype.some.call(heads, function(h) { return h.getAttribute('data-sort') === key; });
+            sort = valid ? { key: key, dir: p.get('dir') === 'asc' ? 'asc' : 'desc' } : { key: '', dir: '' };
+        }
+
+        function writeUrl(state) {
+            // Keep parameters this page does not own.
+            var p = new URLSearchParams(window.location.search);
+            ['q', 'method', 'status', 'since', 'minq', 'err', 'slow', 'sort', 'dir'].forEach(function(k) { p.delete(k); });
+            if (state.q) { p.set('q', state.q); }
+            if (state.method !== 'ALL') { p.set('method', state.method); }
+            if (state.statusGroup !== 'ALL') { p.set('status', state.statusGroup); }
+            if (state.since) { p.set('since', state.since); }
+            if (state.minq) { p.set('minq', state.minq); }
+            if (state.err) { p.set('err', '1'); }
+            if (state.slow) { p.set('slow', '1'); }
+            if (sort.key) { p.set('sort', sort.key); p.set('dir', sort.dir); }
+            var qs = p.toString();
+            try {
+                history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+            } catch (e) {}
+        }
+
+        function currentState() {
+            return {
+                q: (ctl.q ? ctl.q.value : '').toLowerCase().trim(),
+                method: ctl.method ? ctl.method.value : 'ALL',
+                statusGroup: ctl.status ? ctl.status.value : 'ALL',
+                since: ctl.since ? ctl.since.value : '',
+                minq: ctl.minq && /^\d+$/.test(ctl.minq.value) ? ctl.minq.value : '',
+                err: !!ctl.err && ctl.err.classList.contains('on'),
+                slow: !!ctl.slow && ctl.slow.classList.contains('on')
+            };
+        }
+
+        function apply() {
+            var st = currentState();
+            var terms = st.q.split(/\s+/).filter(Boolean);
+            var now = serverNow + (Date.now() - loadedAt) / 1000;
             var visible = 0;
 
             rows.forEach(function(row) {
-                var rMethod = row.getAttribute('data-method') || '';
-                var rStatus = parseInt(row.getAttribute('data-status') || '0', 10);
-                var rPath = row.getAttribute('data-path') || '';
-                var rAction = row.getAttribute('data-action') || '';
-
-                // Method match
-                var matchMethod = (method === 'ALL' || rMethod === method);
-
-                // Status match
-                var matchStatus = true;
-                if (statusGroup === '2XX') matchStatus = (rStatus >= 200 && rStatus < 300);
-                else if (statusGroup === '3XX') matchStatus = (rStatus >= 300 && rStatus < 400);
-                else if (statusGroup === '4XX') matchStatus = (rStatus >= 400 && rStatus < 500);
-                else if (statusGroup === '5XX') matchStatus = (rStatus >= 500);
-
-                // Query match
-                var matchQuery = true;
-                if (q !== '') {
-                    matchQuery = rPath.includes(q) || rAction.includes(q) || rMethod.toLowerCase().includes(q) || String(rStatus).includes(q);
+                var ok = (st.method === 'ALL' || row.getAttribute('data-method') === st.method)
+                    && statusMatches(st.statusGroup, num(row, 'status'))
+                    && (!st.err || num(row, 'problems') > 0)
+                    && (!st.slow || num(row, 'duration') > 500)
+                    && (!st.minq || num(row, 'queries') >= parseInt(st.minq, 10))
+                    && (!st.since || !serverNow || now - num(row, 'time') <= parseInt(st.since, 10));
+                if (ok && terms.length) {
+                    ok = terms.every(function(t) { return row._text.indexOf(t) !== -1; });
                 }
-
-                if (matchMethod && matchStatus && matchQuery) {
-                    row.style.display = '';
-                    visible++;
-                } else {
-                    row.style.display = 'none';
-                }
+                row.hidden = !ok;
+                if (ok) { visible++; }
             });
 
-            if (countBadge) {
-                countBadge.textContent = visible;
+            var sorted = rows.slice();
+            if (sort.key) {
+                var factor = sort.dir === 'asc' ? 1 : -1;
+                sorted.sort(function(a, b) {
+                    var x, y;
+                    if (sort.key === 'path' || sort.key === 'method') {
+                        x = a.getAttribute('data-' + sort.key); y = b.getAttribute('data-' + sort.key);
+                        var c = x < y ? -1 : (x > y ? 1 : 0);
+                        return c !== 0 ? c * factor : a._i - b._i;
+                    }
+                    x = num(a, sort.key); y = num(b, sort.key);
+                    return x !== y ? (x - y) * factor : a._i - b._i;
+                });
+            } else {
+                sorted.sort(function(a, b) { return a._i - b._i; });
             }
+            sorted.forEach(function(row) { tbody.insertBefore(row, emptyRow); });
+
+            heads.forEach(function(h) {
+                var on = h.getAttribute('data-sort') === sort.key;
+                h.setAttribute('aria-sort', on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+            });
+
+            var active = terms.length > 0 || st.method !== 'ALL' || st.statusGroup !== 'ALL' || !!st.since || !!st.minq || st.err || st.slow;
+            if (countBadge) { countBadge.textContent = active ? visible + ' / ' + rows.length : rows.length; }
+            if (countText) { countText.textContent = active ? visible + ' of ' + rows.length + ' shown' : ''; }
+            if (clearBtn) { clearBtn.hidden = !active; }
+            if (emptyRow) { emptyRow.hidden = visible !== 0; }
+
+            writeUrl(st);
         }
 
-        if (searchInput) searchInput.addEventListener('input', applyFilter);
-        if (methodFilter) methodFilter.addEventListener('change', applyFilter);
-        if (statusFilter) statusFilter.addEventListener('change', applyFilter);
+        heads.forEach(function(h) {
+            h.addEventListener('click', function() {
+                var key = this.getAttribute('data-sort');
+                var first = this.getAttribute('data-sort-first') === 'asc' ? 'asc' : 'desc';
+                var second = first === 'asc' ? 'desc' : 'asc';
+                if (sort.key !== key) { sort = { key: key, dir: first }; }
+                else if (sort.dir === first) { sort = { key: key, dir: second }; }
+                else { sort = { key: '', dir: '' }; }
+                apply();
+            });
+        });
+
+        if (ctl.q) {
+            ctl.q.addEventListener('input', apply);
+            ctl.q.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { this.value = ''; this.blur(); apply(); }
+            });
+        }
+        [ctl.method, ctl.status, ctl.since].forEach(function(c) { if (c) { c.addEventListener('change', apply); } });
+        if (ctl.minq) { ctl.minq.addEventListener('input', apply); }
+        [ctl.err, ctl.slow].forEach(function(t) {
+            if (t) { t.addEventListener('click', function() { this.classList.toggle('on'); apply(); }); }
+        });
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                if (ctl.q) { ctl.q.value = ''; }
+                if (ctl.method) { ctl.method.value = 'ALL'; }
+                if (ctl.status) { ctl.status.value = 'ALL'; }
+                if (ctl.since) { ctl.since.value = ''; }
+                if (ctl.minq) { ctl.minq.value = ''; }
+                if (ctl.err) { ctl.err.classList.remove('on'); }
+                if (ctl.slow) { ctl.slow.classList.remove('on'); }
+                apply();
+            });
+        }
 
         // Shortcut '/' to focus search
         window.addEventListener('keydown', function(e) {
-            if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+            if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey
+                && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(document.activeElement.tagName) === -1) {
                 e.preventDefault();
-                if (searchInput) {
-                    searchInput.focus();
-                    searchInput.select();
+                if (ctl.q) {
+                    ctl.q.focus();
+                    ctl.q.select();
                 }
             }
         });
+
+        readUrl();
+        apply();
     })();
 </script>
