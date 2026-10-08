@@ -211,6 +211,38 @@ final class DumpView
     }
 
     /**
+     * The GET variables: the query string of the request.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function getParams(): array
+    {
+        return RequestParams::get($this->parsedRequest()['startLine'], (string)($this->collector(self::REQUEST)['requestQuery'] ?? ''));
+    }
+
+    /**
+     * The POST variables, with the kind of body they came from, or null when the body has none.
+     *
+     * @return array{data: array<array-key, mixed>, source: string}|null
+     */
+    public function postParams(): ?array
+    {
+        $request = $this->parsedRequest();
+
+        return RequestParams::post($request['headers'], $request['body']);
+    }
+
+    /**
+     * The session variables, or null when the host did not record them.
+     *
+     * @return array<array-key, mixed>|null
+     */
+    public function sessionParams(): ?array
+    {
+        return RequestParams::session($this->data);
+    }
+
+    /**
      * Parsed response HTTP headers and raw body.
      *
      * @return array{startLine: string, headers: array<string, list<string>>, body: string}

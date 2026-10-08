@@ -41,6 +41,9 @@ $exceptions = $view->exceptions();
 $request = $view->request();
 $parsedReq = $view->parsedRequest();
 $parsedRes = $view->parsedResponse();
+$getParams = $view->getParams();
+$post = $view->postParams();
+$sessionParams = $view->sessionParams();
 $route = $view->route();
 $routesTree = $view->routesTree();
 $events = $view->events();
@@ -1263,6 +1266,47 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <?php } ?>
             </div>
         </div>
+
+        <!-- GET / POST / SESSION variables -->
+        <?php
+        $variablePanels = [
+            ['id' => 'vars-get', 'title' => 'GET', 'data' => $getParams, 'badge' => null,
+                'empty' => 'No query string parameters.'],
+            ['id' => 'vars-post', 'title' => 'POST', 'data' => $post['data'] ?? [], 'badge' => $post !== null ? strtoupper($post['source']) : null,
+                'empty' => 'No form fields in the request body.'],
+            ['id' => 'vars-session', 'title' => 'SESSION', 'data' => $sessionParams ?? [], 'badge' => null,
+                'empty' => $sessionParams === null
+                    ? 'The session is not recorded. yiisoft/yii-debug has no session collector: register one in the host application (a collector whose class name contains "Session") and it shows here.'
+                    : 'The session was empty.'],
+        ];
+        foreach ($variablePanels as $panel) { ?>
+            <div class="dash-panel" id="<?= $panel['id'] ?>">
+                <div class="dash-panel-header">
+                    <div class="dash-panel-title">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        <span><?= $panel['title'] ?> variables</span>
+                    </div>
+                    <span>
+                        <?php if ($panel['badge'] !== null) { ?><span class="dash-badge"><?= Template::e($panel['badge']) ?></span><?php } ?>
+                        <span class="dash-badge"><?= count($panel['data']) ?></span>
+                    </span>
+                </div>
+                <div class="pad-panel">
+                    <?php if ($panel['data'] !== []) { ?>
+                        <?= BodyView::params($panel['data']) ?>
+                    <?php } else { ?>
+                        <p class="text-muted"><?= Template::e($panel['empty']) ?></p>
+                    <?php } ?>
+                </div>
+            </div>
+        <?php } ?>
 
         <!-- Response Section -->
         <div class="dash-panel">

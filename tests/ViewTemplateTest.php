@@ -124,6 +124,31 @@ final class ViewTemplateTest extends TestCase
         return [DumpView::REQUEST => ['requestUrl' => 'http://app.test/a', 'requestMethod' => 'GET', 'requestRaw' => $raw]];
     }
 
+    public function testRequestTabShowsGetPostAndSessionPanels(): void
+    {
+        $raw = "POST /login?next=%2Fhome&token=GETSECRET HTTP/1.1\r\nHost: a.test\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\nuser=bob&password=POSTSECRET";
+        $html = self::render([
+            DumpView::REQUEST => ['requestUrl' => 'http://a.test/login?next=%2Fhome', 'requestMethod' => 'POST', 'requestRaw' => $raw],
+            'App\\SessionCollector' => ['data' => ['user_id' => 7]],
+        ]);
+
+        foreach (['vars-get', 'vars-post', 'vars-session'] as $id) {
+            self::assertStringContainsString('id="' . $id . '"', $html);
+        }
+        self::assertStringContainsString('>next<', $html);
+        self::assertStringContainsString('>user<', $html);
+        self::assertStringContainsString('class="jt-num">7', $html);
+    }
+
+    public function testSessionPanelSaysWhyItIsEmptyWhenNothingRecordsTheSession(): void
+    {
+        $html = self::render(self::requestDump(''));
+
+        self::assertStringContainsString('The session is not recorded', $html);
+        self::assertStringContainsString('No query string parameters.', $html);
+        self::assertStringContainsString('No form fields in the request body.', $html);
+    }
+
     public function testRequestTabOffersAMaskedCurlCommandWithAnOptInForCredentials(): void
     {
         $html = self::render(self::requestDump('SESSID=topsecret'));

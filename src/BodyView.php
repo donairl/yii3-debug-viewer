@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dxn\DebugViewer;
 
+use function array_is_list;
 use function array_pad;
 use function count;
 use function explode;
@@ -109,6 +110,35 @@ final class BodyView
         }
 
         return self::wrap('TEXT', $size, [['raw', 'Raw', self::pre($raw, $cut, $size)]], 'raw', $cut, $note);
+    }
+
+    /**
+     * A name/value table for request variables (GET, POST, SESSION). Nested
+     * values open as a tree, like a JSON body.
+     *
+     * @param array<array-key, mixed> $params
+     */
+    public static function params(array $params): string
+    {
+        if ($params === []) {
+            return '';
+        }
+
+        $rows = '';
+        $shown = 0;
+        foreach ($params as $name => $value) {
+            if (++$shown > self::MAX_FORM_FIELDS) {
+                $rows .= '<tr><td colspan="2" class="text-muted">… ' . number_format(count($params) - self::MAX_FORM_FIELDS) . ' more</td></tr>';
+                break;
+            }
+            $cell = is_array($value) || is_object($value)
+                ? '<div class="jt">' . self::node($value, null, 0, 1) . '</div>'
+                : (is_string($value) ? self::e($value) : self::scalar($value));
+            $rows .= '<tr><td class="body-form-name">' . self::e((string)$name) . '</td><td class="body-form-value">' . $cell . '</td></tr>';
+        }
+
+        return '<div class="body-view"><table class="dash-table body-form"><thead><tr><th style="width: 220px;">Name</th><th>Value</th></tr></thead><tbody>'
+            . $rows . '</tbody></table></div>';
     }
 
     /**
@@ -222,7 +252,7 @@ final class BodyView
 
         if (is_array($value) || is_object($value)) {
             $items = (array)$value;
-            $isList = is_array($value);
+            $isList = is_array($value) && array_is_list($value);
             $open = $isList ? '[' : '{';
             $close = $isList ? ']' : '}';
 
