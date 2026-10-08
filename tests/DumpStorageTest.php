@@ -120,6 +120,20 @@ final class DumpStorageTest extends TestCase
         self::assertSame(['id' => $id, 'method' => 'GET', 'path' => '/p' . $id, 'status' => 200], array_intersect_key($row, array_flip(['id', 'method', 'path', 'status'])));
     }
 
+    public function testListRowNamesAnActionWrittenAsAnArrayCallable(): void
+    {
+        // `Route::post(...)->action([Class::class, 'method'])` is recorded as a JSON array, not a string
+        $id = self::id(100);
+        $this->dump('2026-10-01', $id, summary: ['summary' => [
+            'Yiisoft\\Router\\Debug\\RouterCollector' => ['name' => 'debug.clear', 'action' => ['App\\DeleteAction', 'all']],
+        ]]);
+
+        $row = $this->storage()->list()[0];
+
+        self::assertSame('App\\DeleteAction::all', $row['action']);
+        self::assertSame('debug.clear', $row['routeName']);
+    }
+
     public function testGetFindsADumpInAnyDate(): void
     {
         $old = self::id(1000);

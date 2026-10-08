@@ -178,7 +178,7 @@ final class DumpStorage
             'exceptions' => is_array($exceptions) ? count($exceptions) : 0,
             'durationMs' => ((float)($appInfo['request']['processingTime'] ?? 0)) * 1000,
             'memoryMb' => ((float)($appInfo['memory']['peakUsage'] ?? 0)) / 1048576,
-            'action' => (string)($router['action'] ?? ''),
+            'action' => self::actionName($router['action'] ?? null),
             'routeName' => (string)($router['name'] ?? ''),
         ];
     }
@@ -235,6 +235,21 @@ final class DumpStorage
         @rmdir(dirname($dir));
 
         return $removed;
+    }
+
+    /**
+     * The route's action as one string. A route registered with
+     * `->action([Class::class, 'method'])` is recorded as a two-item array.
+     */
+    private static function actionName(mixed $action): string
+    {
+        if (is_string($action)) {
+            return $action;
+        }
+
+        return is_array($action) && count($action) === 2 && is_string($action[0] ?? null) && is_string($action[1] ?? null)
+            ? $action[0] . '::' . $action[1]
+            : '';
     }
 
     /**
