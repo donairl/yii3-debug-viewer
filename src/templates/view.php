@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Dxn\DebugViewer\BodyView;
 use Dxn\DebugViewer\CurlCommand;
 use Dxn\DebugViewer\DumpView;
 use Dxn\DebugViewer\EditorLinker;
@@ -404,6 +405,35 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
     .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
     .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* Request / response bodies */
+    .body-view { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 1rem; }
+    .body-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.4rem 0.75rem; background: var(--bg-surface-subtle); border-bottom: 1px solid var(--border-subtle); font-size: 12px; }
+    .body-view > .body-note:only-child { padding: 0.6rem 0.75rem; }
+    .body-modes { display: inline-flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; }
+    .body-mode { background: var(--bg-surface); border: 0; padding: 2px 10px; font-size: 11.5px; color: var(--text-secondary); cursor: pointer; font-family: var(--font-sans); }
+    .body-mode + .body-mode { border-left: 1px solid var(--border-subtle); }
+    .body-mode.active { background: var(--accent); color: #fff; }
+    .body-tools { margin-left: auto; display: inline-flex; gap: 0.4rem; }
+    .body-tool { padding: 2px 9px; font-size: 11.5px; }
+    .body-note { padding: 0.4rem 0.75rem; font-size: 12px; }
+    .body-pane { max-height: 480px; overflow: auto; }
+    .body-text { margin: 0; border: 0; border-radius: 0; white-space: pre-wrap; word-break: break-word; }
+    .body-form { margin: 0; }
+    .body-form-name, .body-form-value { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+    .body-form-name { font-weight: 600; color: var(--text-primary); }
+    .jt { padding: 0.5rem 0.75rem; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; }
+    .jt-children { padding-left: 1.25rem; border-left: 1px dotted var(--border-strong); margin-left: 0.3rem; }
+    .jt-row { padding-left: 1rem; word-break: break-all; }
+    .jt details > summary { cursor: pointer; list-style: none; }
+    .jt details > summary::-webkit-details-marker { display: none; }
+    .jt details > summary::before { content: '\25B8'; display: inline-block; width: 1rem; color: var(--text-muted); }
+    .jt details[open] > summary::before { content: '\25BE'; }
+    .jt-key { color: var(--c-info); }
+    .jt-sep, .jt-meta, .jt-more { color: var(--text-muted); }
+    .jt-str { color: var(--c-ok); }
+    .jt-num { color: var(--c-warn); }
+    .jt-bool, .jt-null { color: var(--accent); }
 
     /* Masked-values notice */
     .redaction-note {
@@ -1230,7 +1260,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
                 <?php if (trim($parsedReq['body']) !== '') { ?>
                     <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Request Body</h4>
-                    <pre><?= Template::e($parsedReq['body']) ?></pre>
+                    <?= BodyView::render($parsedReq['headers'], $parsedReq['body']) ?>
                 <?php } ?>
             </div>
         </div>
@@ -1274,14 +1304,8 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <?php } ?>
 
                 <?php if (trim($parsedRes['body']) !== '') { ?>
-                    <details>
-                        <summary style="font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; padding: 0.4rem 0;">
-                            View Response Body Preview (<?= strlen($parsedRes['body']) ?> bytes)
-                        </summary>
-                        <pre style="max-height: 400px; margin-top: 0.5rem;"><?= Template::e(substr($parsedRes['body'], 0, 10000)) ?><?= strlen($parsedRes['body']) > 10000 ? "
-
-[... truncated ...]" : '' ?></pre>
-                    </details>
+                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Response Body</h4>
+                    <?= BodyView::render($parsedRes['headers'], $parsedRes['body']) ?>
                 <?php } ?>
             </div>
         </div>
@@ -1706,6 +1730,34 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 e.preventDefault();
                 box.focus();
                 box.select();
+            }
+        });
+
+        // Bodies: switch between Tree / Pretty / Raw, fold the tree, copy the raw text
+        document.querySelectorAll('.body-view').forEach(function(view) {
+            view.querySelectorAll('[data-body-mode]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var mode = this.getAttribute('data-body-mode');
+                    view.querySelectorAll('[data-body-mode]').forEach(function(b) {
+                        b.classList.toggle('active', b === btn);
+                    });
+                    view.querySelectorAll('.body-pane').forEach(function(p) {
+                        p.hidden = p.getAttribute('data-pane') !== mode;
+                    });
+                });
+            });
+            view.querySelectorAll('[data-body-fold]').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var open = this.getAttribute('data-body-fold') === 'open';
+                    view.querySelectorAll('.jt details').forEach(function(d) { d.open = open; });
+                });
+            });
+            var copy = view.querySelector('[data-body-copy]');
+            if (copy) {
+                copy.addEventListener('click', function() {
+                    var raw = view.querySelector('[data-pane="raw"] pre');
+                    if (raw) { copyToClipboard(raw.textContent, 'Body'); }
+                });
             }
         });
 

@@ -41,6 +41,13 @@ the raw collector summary. On top of that:
   there is nothing, it says so. The container probing for services it then
   autowires (`NotFoundException`) is ignored, since it happens on every
   request.
+- **Readable bodies.** Request and response bodies are shown by their
+  `Content-Type`: JSON as a collapsible tree (with Expand/Collapse all, plus
+  Pretty and Raw views), a form as a name/value table, anything else as text,
+  and binary as a one-line note. The tree is built on the server from native
+  `<details>`, so it works without JavaScript and in an exported snapshot.
+  Large bodies are cut (200 KB shown, JSON over 1 MB or 5,000 nodes stays text)
+  and a cut body offers no Copy. HTML is shown as source, never rendered.
 - **Replay as cURL.** The Request tab rebuilds the recorded request as a
   `curl` command you can paste into a shell: method, URL, headers and body,
   quoted for POSIX shells. Credentials are masked by default (see
