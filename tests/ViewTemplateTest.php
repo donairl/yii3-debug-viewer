@@ -12,10 +12,10 @@ use ReflectionMethod;
 
 final class ViewTemplateTest extends TestCase
 {
-    private static function render(array $data): string
+    private static function render(array $data, ?string $warning = null): string
     {
         $meta = ['id' => 'abc', 'method' => 'GET', 'path' => '/x', 'url' => '', 'status' => 200, 'durationMs' => 5.0, 'memoryMb' => 2.0, 'time' => 1791429329.0];
-        $params = ['title' => 't', 'indexUrl' => '/debug', 'meta' => $meta, 'summary' => [], 'view' => new DumpView($data), 'editor' => new EditorLinker()];
+        $params = ['title' => 't', 'indexUrl' => '/debug', 'meta' => $meta, 'summary' => [], 'view' => new DumpView($data), 'editor' => new EditorLinker(), 'warning' => $warning];
 
         return (string)(new ReflectionMethod(Template::class, 'render'))
             ->invoke(null, dirname(__DIR__) . '/src/templates/view.php', $params);
@@ -59,6 +59,15 @@ final class ViewTemplateTest extends TestCase
 
         preg_match_all('/data-flt-chip="level" data-flt-value="([^"]+)"/', $html, $m);
         self::assertSame(['warning', 'info'], $m[1]);
+    }
+
+    public function testShowsWhyADumpWasNotFullyLoaded(): void
+    {
+        $html = self::render([], 'data.json is too large to load (20 MB, limit 16 MB).');
+
+        self::assertStringContainsString('Dump not fully loaded.', $html);
+        self::assertStringContainsString('too large to load', $html);
+        self::assertStringNotContainsString('Dump not fully loaded.', self::render([]));
     }
 
     public function testNoFilterBarsWhenTabsAreEmpty(): void

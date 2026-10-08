@@ -93,10 +93,20 @@ data:
     'enabled' => Environment::isDev(),
     'dumpPath' => '@runtime/debug',  // optional
     'listLimit' => 100,              // optional
+    'maxDumpSize' => 16 * 1024 * 1024,   // optional, bytes; 0 = no limit
     'editor' => 'phpstorm',          // optional, see below
     'pathMap' => ['/app' => '/home/me/project'],   // optional
 ],
 ```
+
+`maxDumpSize` guards memory: decoding a `data.json` takes several times its
+size in RAM, so a larger file is not loaded. The request page still opens
+from its summary and says why the rest is missing. The same notice appears
+when `data.json` is missing or cannot be decoded, rather than showing empty
+tabs with no explanation.
+
+Dumps are listed newest first by request id (yii-debug ids start with the
+time), so listing and opening a dump do not scan the whole dump directory.
 
 ### Open in editor
 

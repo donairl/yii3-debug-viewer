@@ -46,6 +46,7 @@ final readonly class ViewAction
             'meta' => $dump['meta'],
             'summary' => $dump['summary'],
             'view' => new DumpView($dump['data']),
+            'warning' => $dump['warning'],
             'editor' => $this->editor,
         ]);
     }

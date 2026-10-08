@@ -9,6 +9,9 @@ return [
         'enabled' => false,
         'dumpPath' => '@runtime/debug',
         'listLimit' => 100,
+        // data.json larger than this many bytes is not decoded (decoding needs
+        // several times the file size in memory). 0 removes the limit.
+        'maxDumpSize' => 16 * 1024 * 1024,
         // Turn file:line locations into "open in editor" links. One of
         // phpstorm, idea, vscode, cursor, sublime, textmate, or a custom URL
         // containing {file} and {line}. Empty: plain text.

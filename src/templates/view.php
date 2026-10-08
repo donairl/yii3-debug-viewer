@@ -12,6 +12,7 @@ use Dxn\DebugViewer\Template;
  * @var array<string, mixed> $summary
  * @var DumpView $view
  * @var EditorLinker $editor
+ * @var string|null $warning
  * @var string $indexUrl
  */
 
@@ -190,6 +191,13 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         </div>
     </div>
 </div>
+
+<?php if (($warning ?? null) !== null) { ?>
+    <div class="dash-panel" style="border-color: var(--c-warn-border); background: var(--c-warn-bg); padding: 0.85rem 1rem; margin-bottom: 1.25rem; color: var(--text-primary);">
+        <b style="color: var(--c-warn);">Dump not fully loaded.</b>
+        <?= Template::e($warning) ?>
+    </div>
+<?php } ?>
 
 <!-- Tabs Navigation -->
 <div style="display: flex; align-items: center; gap: 0.35rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 2px;">

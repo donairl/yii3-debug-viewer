@@ -20,6 +20,7 @@ return [
         '__construct()' => [
             'aliases' => Reference::to(Aliases::class),
             'path' => $config['dumpPath'],
+            'maxDumpBytes' => max(0, (int)($config['maxDumpSize'] ?? 16 * 1024 * 1024)),
         ],
     ],
 
