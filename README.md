@@ -32,6 +32,15 @@ Detail: SQL queries with parameters substituted and the calling `file:line`,
 log entries by level, exceptions, matched route, request/response, events and
 the raw collector summary. On top of that:
 
+- **What went wrong.** The top of the Overview lists everything worth a
+  look, errors first, each with a button that opens the right tab and
+  highlights the entry: exceptions, failed queries, error-level logs, 5xx
+  responses, requests slower than 500 ms (warning above 200 ms), warning
+  logs, 4xx responses, N+1 and duplicate queries, queries slower than
+  100 ms, failed container services and peak memory of 64 MB or more. When
+  there is nothing, it says so. The container probing for services it then
+  autowires (`NotFoundException`) is ignored, since it happens on every
+  request.
 - **Stack traces.** Each exception (and its `previous` chain) is listed as
   frames with `file:line`. The throw site and your own code stay visible;
   runs of vendor frames fold away. "Copy trace" copies message and frames.

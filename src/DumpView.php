@@ -9,6 +9,7 @@ use function count;
 use function is_array;
 use function is_numeric;
 use function is_scalar;
+use function str_contains;
 use function max;
 use function min;
 
@@ -298,6 +299,20 @@ final class DumpView
         }
 
         return $rows;
+    }
+
+    /**
+     * Whether a service lookup really failed. The container probes with get()
+     * before falling back to autowiring, so a NotFoundException happens on
+     * every request and is not a problem.
+     *
+     * @param array<string, mixed> $service A row from services().
+     */
+    public static function serviceFailed(array $service): bool
+    {
+        return $service['status'] !== 'success'
+            && $service['status'] !== 'unknown'
+            && !str_contains((string)($service['error'] ?? ''), 'NotFoundException');
     }
 
     public function appInfo(): array

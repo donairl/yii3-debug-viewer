@@ -83,7 +83,7 @@ final class Timeline
                 continue;
             }
             $durationMs = $service['durationMs'] ?? 0.0;
-            $failed = $service['status'] !== 'success' && $service['status'] !== 'unknown';
+            $failed = DumpView::serviceFailed($service);
             if ($durationMs < $minServiceMs && !$failed) {
                 $hiddenServices++;
                 continue;

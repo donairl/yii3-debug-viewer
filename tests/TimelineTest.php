@@ -80,6 +80,19 @@ final class TimelineTest extends TestCase
         self::assertSame('nope', $services[1]['detail']);
     }
 
+    public function testRoutineContainerMissesAreNotShownAsFailures(): void
+    {
+        $data = self::data();
+        $t = self::T0;
+        $data[DumpView::SERVICE][] = ['service' => 'Probe', 'class' => 'Yiisoft\\Di\\Container', 'method' => 'get', 'status' => 'failed', 'error' => 'object@Yiisoft\\Di\\NotFoundException#9', 'timeStart' => $t + 0.071, 'timeEnd' => $t + 0.0711];
+
+        $tl = Timeline::build(new DumpView($data));
+        $listed = array_column(array_filter($tl['items'], static fn(array $i): bool => $i['type'] === 'service'), 'label');
+
+        self::assertSame(2, $tl['hiddenServices'], 'the probe is just another fast service');
+        self::assertNotContains('Container::get()', $listed);
+    }
+
     public function testPointsHaveNoDurationAndLogsCollapseWhitespace(): void
     {
         $items = Timeline::build(new DumpView(self::data()))['items'];

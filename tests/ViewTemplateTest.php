@@ -70,6 +70,53 @@ final class ViewTemplateTest extends TestCase
         self::assertStringNotContainsString('Dump not fully loaded.', self::render([]));
     }
 
+    private static function brokenDump(): array
+    {
+        $t = 1791429329.0;
+
+        return [
+            DumpView::DB => ['queries' => [
+                'a' => ['position' => 0, 'sql' => 'SELECT 1', 'status' => 'success', 'actions' => [['time' => $t], ['time' => $t + 0.001]]],
+                'b' => ['position' => 1, 'sql' => 'SELECT nope', 'status' => 'error', 'actions' => [['time' => $t], ['time' => $t + 0.001]]],
+            ]],
+            DumpView::LOG => [['level' => 'info', 'message' => 'fine'], ['level' => 'error', 'message' => 'bad']],
+            DumpView::EXCEPTION => [['class' => 'RuntimeException', 'message' => 'boom', 'file' => '/app/A.php', 'line' => 3, 'trace' => []]],
+        ];
+    }
+
+    public function testOverviewListsWhatWentWrong(): void
+    {
+        $html = self::render(self::brokenDump());
+
+        self::assertStringContainsString('What went wrong', $html);
+        self::assertStringContainsString('Exception: boom', $html);
+        self::assertStringContainsString('1 failed query', $html);
+        self::assertStringContainsString('1 error-level log entry', $html);
+        self::assertStringNotContainsString('No problems detected', $html);
+    }
+
+    public function testOverviewSaysSoWhenNothingIsWrong(): void
+    {
+        $html = self::render([DumpView::LOG => [['level' => 'info', 'message' => 'fine']]]);
+
+        self::assertStringContainsString('No problems detected', $html);
+        self::assertStringNotContainsString('What went wrong', $html);
+    }
+
+    public function testEveryProblemLinkPointsAtAnElementThatExists(): void
+    {
+        $html = self::render(self::brokenDump());
+
+        preg_match_all('/data-goto-tab="(\w+)"(?: data-goto-target="([^"]+)")?/', $html, $m, PREG_SET_ORDER);
+        self::assertNotEmpty($m);
+        foreach ($m as $link) {
+            self::assertStringContainsString('id="pane-' . $link[1] . '"', $html, "tab {$link[1]}");
+            if (($link[2] ?? '') !== '') {
+                self::assertStringContainsString('id="' . $link[2] . '"', $html, "target {$link[2]}");
+            }
+        }
+    }
+
     public function testNoFilterBarsWhenTabsAreEmpty(): void
     {
         $html = self::render([]);

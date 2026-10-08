@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Dxn\DebugViewer\DumpView;
 use Dxn\DebugViewer\EditorLinker;
 use Dxn\DebugViewer\ExceptionTrace;
+use Dxn\DebugViewer\ProblemFinder;
 use Dxn\DebugViewer\Template;
 
 /**
@@ -51,6 +52,7 @@ $exceptionDetails = $view->exceptionDetails();
 $insights = $view->queryInsights();
 $queryFlags = $insights['flags'];
 $timeline = $view->timeline();
+$problems = ProblemFinder::find($view, $meta);
 
 /** Short, single-line form of a statement for headings. */
 $shorten = static fn(string $text, int $max = 140): string => mb_strimwidth((string)preg_replace('/\s+/', ' ', $text), 0, $max, '…');
@@ -344,6 +346,18 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
     .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
     .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
+    /* Problem summary */
+    .problem { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 1rem; border-top: 1px solid var(--border-subtle); }
+    .problem-sev { text-transform: uppercase; flex: none; width: 3.4rem; justify-content: center; margin-top: 2px; }
+    .problem-body { flex: 1; min-width: 0; }
+    .problem-title { font-weight: 600; color: var(--text-primary); font-size: 13.5px; word-break: break-word; }
+    .problem-detail { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; word-break: break-word; }
+    .problems-ok {
+        display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;
+        padding: 0.6rem 1rem; border-radius: var(--radius-md);
+        background: var(--c-ok-bg); border: 1px solid var(--c-ok-border); color: var(--c-ok); font-size: 13px; font-weight: 500;
+    }
+
     /* Query insights */
     .insight {
         padding: 0.85rem 1rem;
@@ -474,24 +488,42 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
 <!-- 1. TAB: OVERVIEW -->
 <div class="dash-tab-pane active" id="pane-overview">
-    <?php if ($exceptionDetails !== []) { ?>
-        <?php $first = $exceptionDetails[0]; ?>
-        <div class="dash-panel" style="border-color: var(--c-err-border); margin-bottom: 1.25rem;">
-            <div class="dash-panel-header" style="background: var(--c-err-bg); border-color: var(--c-err-border);">
-                <div class="dash-panel-title" style="color: var(--c-err);">
-                    <span><?= Template::e($first['class']) ?></span>
-                    <?php if (count($exceptionDetails) > 1) { ?>
-                        <span class="dash-badge badge-danger">+<?= count($exceptionDetails) - 1 ?> previous</span>
+    <?php if ($problems === []) { ?>
+        <div class="problems-ok">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span>No problems detected: no exceptions, failed queries, error logs or repeated queries.</span>
+        </div>
+    <?php } else { ?>
+        <?php
+        $errorCount = count(array_filter($problems, static fn(array $p): bool => $p['severity'] === ProblemFinder::ERROR));
+        $warnCount = count($problems) - $errorCount;
+        ?>
+        <div class="dash-panel" style="margin-bottom: 1.25rem; border-color: <?= $errorCount > 0 ? 'var(--c-err-border)' : 'var(--c-warn-border)' ?>;">
+            <div class="dash-panel-header" style="background: <?= $errorCount > 0 ? 'var(--c-err-bg)' : 'var(--c-warn-bg)' ?>;">
+                <div class="dash-panel-title">
+                    <span>What went wrong</span>
+                    <?php if ($errorCount > 0) { ?>
+                        <span class="dash-badge badge-danger"><?= $errorCount ?> <?= $errorCount === 1 ? 'error' : 'errors' ?></span>
+                    <?php } ?>
+                    <?php if ($warnCount > 0) { ?>
+                        <span class="dash-badge badge-warning"><?= $warnCount ?> <?= $warnCount === 1 ? 'warning' : 'warnings' ?></span>
                     <?php } ?>
                 </div>
-                <button class="dash-btn" onclick="document.querySelector('.dash-tab[data-tab=logs]').click();">View stack trace &rarr;</button>
             </div>
-            <div style="padding: 0.85rem 1rem;">
-                <div style="font-weight: 600; color: var(--text-primary);"><?= Template::e($first['message']) ?></div>
-                <?php if ($first['file'] !== '') { ?>
-                    <div class="font-mono text-muted" style="font-size: 12px; margin-top: 0.3rem;"><?= $fileLineHtml((string)$first['file'], (string)$first['line']) ?></div>
-                <?php } ?>
-            </div>
+            <?php foreach ($problems as $problem) { ?>
+                <div class="problem problem-<?= Template::e($problem['severity']) ?>">
+                    <span class="dash-badge <?= $problem['severity'] === ProblemFinder::ERROR ? 'badge-danger' : 'badge-warning' ?> problem-sev"><?= $problem['severity'] === ProblemFinder::ERROR ? 'error' : 'warn' ?></span>
+                    <div class="problem-body">
+                        <div class="problem-title"><?= Template::e($problem['title']) ?></div>
+                        <?php if ($problem['detail'] !== '') { ?>
+                            <div class="problem-detail font-mono"><?= Template::e($problem['detail']) ?></div>
+                        <?php } ?>
+                    </div>
+                    <?php if ($problem['tab'] !== null) { ?>
+                        <button type="button" class="dash-btn" data-goto-tab="<?= Template::e($problem['tab']) ?>"<?= $problem['target'] !== null ? ' data-goto-target="' . Template::e($problem['target']) . '"' : '' ?>>Show &rarr;</button>
+                    <?php } ?>
+                </div>
+            <?php } ?>
         </div>
     <?php } ?>
 
@@ -1003,13 +1035,13 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($logs as $log) { ?>
+                        <?php foreach ($logs as $logIndex => $log) { ?>
                             <?php
                             $lvl = strtolower($log['level']);
                             $isErr = in_array($lvl, ['error', 'critical', 'alert', 'emergency'], true);
                             $isWarn = ($lvl === 'warning');
                             ?>
-                            <tr data-flt-item data-level="<?= Template::e($lvl) ?>" data-context="<?= $log['context'] !== null ? '1' : '0' ?>">
+                            <tr id="log-<?= $logIndex ?>" data-flt-item data-level="<?= Template::e($lvl) ?>" data-context="<?= $log['context'] !== null ? '1' : '0' ?>">
                                 <td>
                                     <span class="dash-badge <?= $isErr ? 'badge-danger' : ($isWarn ? 'badge-warning' : '') ?>" style="text-transform: uppercase;">
                                         <?= Template::e($lvl) ?>
@@ -1419,17 +1451,28 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
             activateTab(hash);
         }
 
+        function flash(target) {
+            if (!target) { return; }
+            target.scrollIntoView({ block: 'center' });
+            target.classList.remove('query-flash');
+            void target.offsetWidth;
+            target.classList.add('query-flash');
+        }
+
         // Jump to a query in the Database tab (timeline rows, insight cards)
         document.querySelectorAll('[data-goto-query]').forEach(function(el) {
             el.addEventListener('click', function() {
                 activateTab('sql');
-                var target = document.getElementById('q-' + this.getAttribute('data-goto-query'));
-                if (target) {
-                    target.scrollIntoView({ block: 'center' });
-                    target.classList.remove('query-flash');
-                    void target.offsetWidth;
-                    target.classList.add('query-flash');
-                }
+                flash(document.getElementById('q-' + this.getAttribute('data-goto-query')));
+            });
+        });
+
+        // Jump to a tab, and to an element in it (problem list)
+        document.querySelectorAll('[data-goto-tab]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                activateTab(this.getAttribute('data-goto-tab'));
+                var id = this.getAttribute('data-goto-target');
+                if (id) { flash(document.getElementById(id)); }
             });
         });
 
