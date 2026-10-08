@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<psalm
+    errorLevel="4"
+    resolveFromConfigFile="true"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://getpsalm.org/schema/config"
+    xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+    findUnusedBaselineEntry="true"
+    findUnusedCode="true"
+    strictBinaryOperands="false"
+>
+    <projectFiles>
+        <directory name="src" />
+        <ignoreFiles>
+            <directory name="vendor" />
+        </ignoreFiles>
+    </projectFiles>
+
+    <issueHandlers>
+        <!-- Built and called by the host's container and router, never from this code. -->
+        <PossiblyUnusedMethod>
+            <errorLevel type="suppress">
+                <referencedMethod name="Dxn\DebugViewer\DeleteAction::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\DumpReader::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\DumpStorage::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\EditorLinker::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\ExportAction::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\IndexAction::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\Template::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\ViewAction::__construct"/>
+                <referencedMethod name="Dxn\DebugViewer\DeleteAction::one"/>
+                <referencedMethod name="Dxn\DebugViewer\DeleteAction::all"/>
+                <!-- public API the tests and hosts use -->
+                <referencedMethod name="Dxn\DebugViewer\EditorLinker::enabled"/>
+                <referencedMethod name="Dxn\DebugViewer\Redactor::sql"/>
+            </errorLevel>
+        </PossiblyUnusedMethod>
+        <!-- Spread into the host's route list by the host. -->
+        <UnusedClass>
+            <errorLevel type="suppress">
+                <referencedClass name="Dxn\DebugViewer\Routes"/>
+            </errorLevel>
+        </UnusedClass>
+    </issueHandlers>
+</psalm>

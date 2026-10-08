@@ -267,9 +267,12 @@ Tests:
 composer test
 ```
 
-Static analysis:
+Static analysis (Psalm, level 4, clean):
 
 ```bash
-composer install
-vendor/bin/psalm
+composer psalm
 ```
+
+`psalm.xml` silences two things on purpose: constructors and action methods
+that only the host's container and router call, and the `Routes` class the
+host spreads into its own route list.

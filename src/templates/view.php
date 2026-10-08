@@ -45,7 +45,6 @@ $route = $view->route();
 $routesTree = $view->routesTree();
 $events = $view->events();
 $services = $view->services();
-$appInfo = $view->appInfo();
 $collectorNames = $view->collectorNames();
 
 $queryErrors = 0;
@@ -140,7 +139,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 <!-- View Top Info Bar -->
 <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.85rem;">
     <!-- Breadcrumb & ID -->
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+    <div class="bar-between">
         <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 12.5px; color: var(--text-muted);">
             <?php if ($export === null) { ?>
                 <a href="<?= Template::e($indexUrl) ?>" style="color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.3rem;">
@@ -164,7 +163,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         </div>
 
         <div style="display: flex; align-items: center; gap: 0.75rem; font-size: 12px; color: var(--text-muted);">
-            <span style="font-family: var(--font-mono);">
+            <span class="mono">
                 <?= Template::e(date('Y-m-d H:i:s', (int)$time)) ?>
             </span>
             <span>&middot;</span>
@@ -173,28 +172,28 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <span>&middot;</span>
                 <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
                     <span>Export</span>
-                    <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['json']) ?>" download title="The request data as one JSON file">JSON</a>
-                    <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['html']) ?>" download title="This page as one self-contained HTML file">HTML</a>
+                    <a class="btn-xs dash-btn" href="<?= Template::e($exportUrls['json']) ?>" download title="The request data as one JSON file">JSON</a>
+                    <a class="btn-xs dash-btn" href="<?= Template::e($exportUrls['html']) ?>" download title="This page as one self-contained HTML file">HTML</a>
                 </span>
             <?php } ?>
             <?php if ($export === null && $canDelete) { ?>
                 <span>&middot;</span>
                 <form method="post" action="<?= Template::e($deleteUrl) ?>" class="inline" onsubmit="return confirm('Delete this request dump? This cannot be undone.');">
                     <input type="hidden" name="_csrf" value="<?= Template::e($csrf) ?>">
-                    <button type="submit" class="dash-btn dash-btn-danger" style="padding: 2px 9px; font-size: 11.5px;" title="Delete this dump and go back to the list">Delete</button>
+                    <button type="submit" class="btn-xs dash-btn dash-btn-danger" title="Delete this dump and go back to the list">Delete</button>
                 </form>
             <?php } ?>
         </div>
     </div>
 
     <!-- Main Title Card with Status & Action -->
-    <div class="dash-panel" style="padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap;">
+    <div class="title-card dash-panel">
         <div style="display: flex; align-items: center; gap: 0.85rem; min-width: 260px;">
             <span class="dash-pill-method <?= Template::methodClass($method) ?>" style="font-size: 13px; padding: 4px 10px;">
                 <?= Template::e($method) ?>
             </span>
             <div style="display: flex; flex-direction: column;">
-                <div style="font-size: 1.15rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); word-break: break-all;">
+                <div class="req-path">
                     <?= Template::e($path) ?>
                 </div>
                 <?php if (isset($route['action']) && $route['action'] !== '') { ?>
@@ -212,14 +211,14 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <span style="font-size: 11px; opacity: 0.9;"><?= Template::e(Template::statusText($status)) ?></span>
             </span>
 
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px;">
+            <div class="stat-chip">
                 <span class="text-muted">Duration:</span>
                 <b style="color: <?= $durationMs > 500 ? 'var(--c-err)' : ($durationMs > 200 ? 'var(--c-warn)' : 'var(--text-primary)') ?>;">
                     <?= Template::e(Template::formatMs($durationMs)) ?>
                 </b>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px;">
+            <div class="stat-chip">
                 <span class="text-muted">Memory:</span>
                 <b style="color: var(--text-primary);">
                     <?= Template::e(number_format($memoryMb, 2)) ?> MB
@@ -230,7 +229,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 </div>
 
 <?php if (($warning ?? null) !== null) { ?>
-    <div class="dash-panel" style="border-color: var(--c-warn-border); background: var(--c-warn-bg); padding: 0.85rem 1rem; margin-bottom: 1.25rem; color: var(--text-primary);">
+    <div class="notice-warn dash-panel">
         <b style="color: var(--c-warn);">Dump not fully loaded.</b>
         <?= Template::e($warning) ?>
     </div>
@@ -262,7 +261,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 <?php } ?>
 
 <!-- Tabs Navigation -->
-<div style="display: flex; align-items: center; gap: 0.35rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 2px;">
+<div class="tab-strip">
     <button class="dash-tab active" data-tab="overview">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect width="7" height="9" x="3" y="3" rx="1"></rect>
@@ -632,7 +631,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     <span>Query insights</span>
                     <span class="dash-badge badge-warning"><?= count($insights['groups']) ?></span>
                     <?php if ($insights['wastedMs'] > 0) { ?>
-                        <span class="text-muted" style="font-size: 12px; font-weight: 400;">~<?= Template::e(Template::formatMs($insights['wastedMs'])) ?> avoidable</span>
+                        <span class="meta-inline text-muted">~<?= Template::e(Template::formatMs($insights['wastedMs'])) ?> avoidable</span>
                     <?php } ?>
                 </div>
             </div>
@@ -660,23 +659,23 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         <td><span class="dash-pill-method <?= Template::methodClass($method) ?>"><?= Template::e($method) ?></span></td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Path</td>
-                        <td><code style="font-weight: 600;"><?= Template::e($path) ?></code></td>
+                        <td class="k-label">Path</td>
+                        <td><code class="bold"><?= Template::e($path) ?></code></td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Full URL</td>
+                        <td class="k-label">Full URL</td>
                         <td style="word-break: break-all; font-family: var(--font-mono); font-size: 12px;"><?= Template::e($url) ?></td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Client IP</td>
+                        <td class="k-label">Client IP</td>
                         <td><code><?= Template::e($request['userIp'] ?? '127.0.0.1') ?></code></td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Ajax / Fetch</td>
+                        <td class="k-label">Ajax / Fetch</td>
                         <td><?= !empty($request['requestIsAjax']) ? '<span class="dash-badge badge-success">YES</span>' : '<span class="dash-badge">NO</span>' ?></td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Matched Route</td>
+                        <td class="k-label">Matched Route</td>
                         <td>
                             <span style="font-weight: 600; color: var(--text-primary);"><?= Template::e($route['name'] ?? 'none') ?></span>
                             <?php if (isset($route['pattern'])) { ?>
@@ -702,38 +701,38 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
             <table class="dash-table">
                 <tbody>
                     <tr>
-                        <td style="width: 140px; font-weight: 600; color: var(--text-muted);">Total Duration</td>
-                        <td style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);">
+                        <td style="width: 140px;" class="k-label">Total Duration</td>
+                        <td class="mono-strong">
                             <?= Template::e(Template::formatMs($durationMs)) ?>
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">SQL Query Time</td>
-                        <td style="font-family: var(--font-mono);">
+                        <td class="k-label">SQL Query Time</td>
+                        <td class="mono">
                             <?= Template::e(Template::formatMs($totalQueryDuration)) ?>
                             <span class="text-muted" style="font-size: 11px;">(<?= count($queries) ?> queries)</span>
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Route Matching</td>
-                        <td style="font-family: var(--font-mono);">
+                        <td class="k-label">Route Matching</td>
+                        <td class="mono">
                             <?= Template::e(Template::formatMs(((float)($route['matchTime'] ?? 0)) * 1000)) ?>
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Peak Memory</td>
+                        <td class="k-label">Peak Memory</td>
                         <td style="font-family: var(--font-mono); color: var(--text-primary); font-weight: 600;">
                             <?= Template::e(number_format($memoryMb, 2)) ?> MB
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">PHP Version</td>
-                        <td style="font-family: var(--font-mono);">
+                        <td class="k-label">PHP Version</td>
+                        <td class="mono">
                             PHP <?= Template::e($summary['Yiisoft\Yii\Debug\Collector\Web\WebAppInfoCollector']['php']['version'] ?? PHP_VERSION) ?>
                         </td>
                     </tr>
                     <tr>
-                        <td style="font-weight: 600; color: var(--text-muted);">Container Services</td>
+                        <td class="k-label">Container Services</td>
                         <td>
                             <span class="dash-badge"><?= count($services) ?> resolved</span>
                         </td>
@@ -763,7 +762,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <table class="dash-table">
                     <thead>
                         <tr>
-                            <th style="width: 45px;">#</th>
+                            <th class="col-45">#</th>
                             <th style="width: 80px;">Status</th>
                             <th style="width: 90px; text-align: right;">Time</th>
                             <th>Query</th>
@@ -782,7 +781,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                                     <?= $q['durationMs'] === null ? '-' : Template::e(number_format((float)$q['durationMs'], 2) . ' ms') ?>
                                 </td>
                                 <td>
-                                    <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); max-width: 800px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    <div class="sql-peek">
                                         <?= DumpView::highlightSql((string)$q['sql']) ?>
                                     </div>
                                     <?php if ($q['line'] !== '') { ?>
@@ -803,8 +802,8 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 <!-- 1b. TAB: TIMELINE -->
 <div class="dash-tab-pane" id="pane-timeline">
     <?php if ($timeline['items'] === []) { ?>
-        <div class="dash-panel" style="padding: 3rem; text-align: center;">
-            <p style="color: var(--text-muted);">No timed activity was recorded for this request.</p>
+        <div class="empty-box dash-panel">
+            <p class="muted">No timed activity was recorded for this request.</p>
         </div>
     <?php } else { ?>
         <?php
@@ -813,10 +812,10 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         $typeClass = ['query' => 'tl-q', 'service' => 'tl-s', 'event' => 'tl-e', 'log' => 'tl-l', 'exception' => 'tl-x'];
         $pct = static fn(float $ms): float => $totalMs > 0 ? min(100.0, max(0.0, $ms / $totalMs * 100)) : 0.0;
         ?>
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;">
+        <div class="bar-between-mb">
             <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">
                 Request timeline
-                <span class="text-muted" style="font-size: 12px; font-weight: 400;">
+                <span class="meta-inline text-muted">
                     (<?= Template::e(Template::formatMs($totalMs)) ?><?= $timeline['hiddenServices'] > 0 ? ', ' . (int)$timeline['hiddenServices'] . ' sub-ms services hidden' : '' ?>)
                 </span>
             </div>
@@ -883,11 +882,11 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
 <!-- 2. TAB: DATABASE (SQL) -->
 <div class="dash-tab-pane" id="pane-sql">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+    <div class="bar-between-mb-sm">
+        <div class="section-title">
             <span>Executed Queries</span>
             <span class="dash-badge"><?= count($queries) ?></span>
-            <span class="text-muted" style="font-size: 12px; font-weight: 400;">
+            <span class="meta-inline text-muted">
                 (Total execution time: <?= Template::e(Template::formatMs($totalQueryDuration)) ?>)
             </span>
         </div>
@@ -917,8 +916,8 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
     <?php } ?>
 
     <?php if ($queries === []) { ?>
-        <div class="dash-panel" style="padding: 3rem; text-align: center;">
-            <p style="color: var(--text-muted);">No database queries were executed during this request.</p>
+        <div class="empty-box dash-panel">
+            <p class="muted">No database queries were executed during this request.</p>
         </div>
     <?php } else { ?>
         <div style="display: flex; flex-direction: column; gap: 1rem;" data-flt-scope="sql">
@@ -934,7 +933,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                      data-slow="<?= $qDur !== null && $qDur > $slowQueryMs ? '1' : '0' ?>"
                      data-flagged="<?= $qFlag !== null ? '1' : '0' ?>">
                     <div class="dash-panel-header" style="padding: 0.65rem 1rem;">
-                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                        <div class="flex-row">
                             <span style="font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: var(--text-muted);">
                                 #<?= $i + 1 ?>
                             </span>
@@ -969,17 +968,17 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         </div>
                     </div>
 
-                    <div style="padding: 1rem;" data-flt-text>
+                    <div data-flt-text class="pad-1">
                         <pre style="margin: 0; background: var(--code-bg);"><?= DumpView::highlightSql($qSql) ?></pre>
 
                         <?php if (!empty($query['params'])) { ?>
                             <div style="margin-top: 0.75rem; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem;">
-                                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem;">
+                                <div class="mini-heading">
                                     Bound Parameters
                                 </div>
                                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                                     <?php foreach ($query['params'] as $pKey => $pVal) { ?>
-                                        <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 3px 8px; font-family: var(--font-mono); font-size: 11.5px;">
+                                        <div class="param-chip">
                                             <span style="color: var(--c-info); font-weight: 600;"><?= Template::e($pKey) ?>:</span>
                                             <span style="color: var(--c-ok);"><?= Template::e(is_scalar($pVal) ? (string)$pVal : json_encode($pVal)) ?></span>
                                         </div>
@@ -989,7 +988,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         <?php } ?>
 
                         <?php if ($query['line'] !== '') { ?>
-                            <div style="margin-top: 0.65rem; font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.35rem;">
+                            <div class="caller-line">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
                                     <polyline points="14 2 14 8 20 8"></polyline>
@@ -1041,7 +1040,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 ?>
                 <div class="dash-panel" style="border-color: var(--c-err-border); margin-bottom: 1rem; background: var(--bg-card);">
                     <div class="dash-panel-header" style="background: var(--c-err-bg); border-color: var(--c-err-border);">
-                        <div style="font-weight: 700; color: var(--c-err); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="exception-class">
                             <span><?= Template::e($ex['class']) ?></span>
                             <?php if ($n > 0) { ?>
                                 <span class="dash-badge">previous</span>
@@ -1054,8 +1053,8 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                             <span>Copy trace</span>
                         </button>
                     </div>
-                    <div style="padding: 1rem;">
-                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: pre-wrap; word-break: break-word;"><?= Template::e($ex['message'] !== '' ? $ex['message'] : 'No message') ?></div>
+                    <div class="pad-1">
+                        <div class="exception-message"><?= Template::e($ex['message'] !== '' ? $ex['message'] : 'No message') ?></div>
                     </div>
                     <?php foreach ($segments as $seg) { ?>
                         <?php if ($seg['vendor'] && count($seg['frames']) > 1) { ?>
@@ -1119,7 +1118,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         </div>
 
         <?php if ($logs === []) { ?>
-            <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
+            <div class="empty-state">
                 No application messages were logged for this request.
             </div>
         <?php } else { ?>
@@ -1127,7 +1126,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <table class="dash-table">
                     <thead>
                         <tr>
-                            <th style="width: 100px;">Level</th>
+                            <th class="col-100">Level</th>
                             <th style="width: 110px;">Time</th>
                             <th>Message</th>
                         </tr>
@@ -1156,7 +1155,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                                     <?php if ($log['context'] !== null) { ?>
                                         <details style="padding: 0.25rem 0.75rem 0.5rem;"<?= strlen($log['context']) <= 800 ? ' open' : '' ?>>
                                             <summary class="text-muted" style="cursor: pointer; font-size: 11.5px;">context (<?= number_format(strlen($log['context'])) ?> bytes)</summary>
-                                            <pre style="margin: 0.25rem 0 0; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 480px; overflow: auto;"><?= Template::e($log['context']) ?></pre>
+                                            <pre class="context-pre"><?= Template::e($log['context']) ?></pre>
                                         </details>
                                     <?php } ?>
                                 </td>
@@ -1171,11 +1170,11 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
 <!-- 4. TAB: REQUEST / RESPONSE -->
 <div class="dash-tab-pane" id="pane-request">
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div class="stack-lg">
         <?php if ($curlSafe !== null) { ?>
             <!-- Replay as cURL -->
             <div class="dash-panel" id="curl-panel">
-                <div class="dash-panel-header" style="flex-wrap: wrap;">
+                <div class="wrap dash-panel-header">
                     <div class="dash-panel-title">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="4 17 10 11 4 5"></polyline>
@@ -1185,32 +1184,32 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                         <?php if ($curlHasSecrets) { ?>
-                            <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
+                            <label class="check-label">
                                 <input type="checkbox" id="curl-secrets"> Include credentials
                             </label>
                         <?php } ?>
                         <button type="button" class="dash-btn" id="curl-copy">Copy command</button>
                     </div>
                 </div>
-                <div style="padding: 1rem 1.25rem;">
-                    <pre class="curl-cmd" id="curl-safe" style="margin: 0; white-space: pre-wrap; word-break: break-all;"><?= Template::e($curlSafe['command']) ?></pre>
+                <div class="pad-panel">
+                    <pre class="pre-flush curl-cmd" id="curl-safe"><?= Template::e($curlSafe['command']) ?></pre>
                     <?php if ($curlHasSecrets) { ?>
-                        <pre class="curl-cmd" id="curl-full" hidden style="margin: 0; white-space: pre-wrap; word-break: break-all;"><?= Template::e($curlFull['command']) ?></pre>
+                        <pre class="pre-flush curl-cmd" id="curl-full" hidden><?= Template::e($curlFull['command']) ?></pre>
                         <div id="curl-warn" hidden class="text-muted" style="margin-top: 0.6rem; font-size: 12px; color: var(--c-warn);">
                             This command contains real cookies, tokens or passwords. Do not paste it into an issue or a chat.
                         </div>
                     <?php } elseif ($maskedInView) { ?>
-                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">
+                        <div class="hint text-muted">
                             Credentials are masked in this view.<?php if ($export === null) { ?> <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a> to get a command with the real values.<?php } ?>
                         </div>
                     <?php } else { ?>
-                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">No credentials were found in this request.</div>
+                        <div class="hint text-muted">No credentials were found in this request.</div>
                     <?php } ?>
                     <?php foreach (array_unique(array_merge($curlSafe['notes'], $curlFull['notes'] ?? [])) as $note) { ?>
                         <div class="text-muted" style="margin-top: 0.4rem; font-size: 12px;">&bull; <?= Template::e($note) ?></div>
                     <?php } ?>
                     <?php if ($curlHasSecrets) { ?>
-                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">
+                        <div class="hint text-muted">
                             Credentials are masked as <code>[REDACTED]</code>: replace them, or tick the box to include the real values.
                         </div>
                     <?php } ?>
@@ -1229,25 +1228,25 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     <span>HTTP Request Details</span>
                 </div>
                 <?php if ($parsedReq['startLine'] !== '') { ?>
-                    <code style="font-weight: 600;"><?= Template::e($parsedReq['startLine']) ?></code>
+                    <code class="bold"><?= Template::e($parsedReq['startLine']) ?></code>
                 <?php } ?>
             </div>
 
-            <div style="padding: 1rem 1.25rem;">
-                <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Request Headers</h4>
+            <div class="pad-panel">
+                <h4 class="sub-heading">Request Headers</h4>
                 <?php if ($parsedReq['headers'] !== []) { ?>
-                    <table class="dash-table" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                    <table class="table-box dash-table">
                         <thead>
                             <tr>
-                                <th style="width: 200px;">Header</th>
+                                <th class="col-200">Header</th>
                                 <th>Value</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($parsedReq['headers'] as $hName => $hVals) { ?>
                                 <tr>
-                                    <td style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);"><?= Template::e($hName) ?></td>
-                                    <td style="font-family: var(--font-mono); font-size: 12px; word-break: break-all;">
+                                    <td class="mono-strong"><?= Template::e($hName) ?></td>
+                                    <td class="mono-cell">
                                         <?= Template::e(implode(', ', $hVals)) ?>
                                     </td>
                                 </tr>
@@ -1259,7 +1258,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <?php } ?>
 
                 <?php if (trim($parsedReq['body']) !== '') { ?>
-                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Request Body</h4>
+                    <h4 class="sub-heading">Request Body</h4>
                     <?= BodyView::render($parsedReq['headers'], $parsedReq['body']) ?>
                 <?php } ?>
             </div>
@@ -1276,25 +1275,25 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     <span>HTTP Response Details</span>
                 </div>
                 <?php if ($parsedRes['startLine'] !== '') { ?>
-                    <code style="font-weight: 600;"><?= Template::e($parsedRes['startLine']) ?></code>
+                    <code class="bold"><?= Template::e($parsedRes['startLine']) ?></code>
                 <?php } ?>
             </div>
 
-            <div style="padding: 1rem 1.25rem;">
-                <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Response Headers</h4>
+            <div class="pad-panel">
+                <h4 class="sub-heading">Response Headers</h4>
                 <?php if ($parsedRes['headers'] !== []) { ?>
-                    <table class="dash-table" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 1rem;">
+                    <table class="table-box dash-table">
                         <thead>
                             <tr>
-                                <th style="width: 200px;">Header</th>
+                                <th class="col-200">Header</th>
                                 <th>Value</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($parsedRes['headers'] as $hName => $hVals) { ?>
                                 <tr>
-                                    <td style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);"><?= Template::e($hName) ?></td>
-                                    <td style="font-family: var(--font-mono); font-size: 12px; word-break: break-all;">
+                                    <td class="mono-strong"><?= Template::e($hName) ?></td>
+                                    <td class="mono-cell">
                                         <?= Template::e(implode(', ', $hVals)) ?>
                                     </td>
                                 </tr>
@@ -1304,7 +1303,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <?php } ?>
 
                 <?php if (trim($parsedRes['body']) !== '') { ?>
-                    <h4 style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem;">Response Body</h4>
+                    <h4 class="sub-heading">Response Body</h4>
                     <?= BodyView::render($parsedRes['headers'], $parsedRes['body']) ?>
                 <?php } ?>
             </div>
@@ -1314,7 +1313,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
 <!-- 5. TAB: ROUTING -->
 <div class="dash-tab-pane" id="pane-routing">
-    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    <div class="stack-lg">
         <!-- Matched Route Card -->
         <div class="dash-panel">
             <div class="dash-panel-header">
@@ -1336,19 +1335,19 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <table class="dash-table">
                     <tbody>
                         <tr>
-                            <td style="width: 140px; font-weight: 600; color: var(--text-muted);">Route Name</td>
+                            <td style="width: 140px;" class="k-label">Route Name</td>
                             <td><b style="color: var(--text-primary); font-size: 13.5px;"><?= Template::e($route['name'] ?? '-') ?></b></td>
                         </tr>
                         <tr>
-                            <td style="font-weight: 600; color: var(--text-muted);">Pattern</td>
+                            <td class="k-label">Pattern</td>
                             <td><code><?= Template::e($route['pattern'] ?? '-') ?></code></td>
                         </tr>
                         <tr>
-                            <td style="font-weight: 600; color: var(--text-muted);">Action Handler</td>
+                            <td class="k-label">Action Handler</td>
                             <td><code style="color: var(--accent); font-weight: 600;"><?= Template::e($route['action'] ?? '-') ?></code></td>
                         </tr>
                         <tr>
-                            <td style="font-weight: 600; color: var(--text-muted);">Arguments</td>
+                            <td class="k-label">Arguments</td>
                             <td><pre style="margin: 0; padding: 0.4rem 0.6rem;"><?= Template::e(DumpView::json($route['arguments'] ?? [])) ?></pre></td>
                         </tr>
                     </tbody>
@@ -1411,7 +1410,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         </div>
 
         <?php if ($services === []) { ?>
-            <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
+            <div class="empty-state">
                 No service resolutions recorded.
             </div>
         <?php } else { ?>
@@ -1419,7 +1418,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <table class="dash-table">
                     <thead>
                         <tr>
-                            <th style="width: 45px;">#</th>
+                            <th class="col-45">#</th>
                             <th>Service / Target</th>
                             <th>Class & Method</th>
                             <th>Status</th>
@@ -1429,7 +1428,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         <?php foreach ($services as $idx => $s) { ?>
                             <tr>
                                 <td class="text-muted font-mono"><?= $idx + 1 ?></td>
-                                <td style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-primary); word-break: break-all;">
+                                <td class="mono-strong-wrap">
                                     <?= Template::e($s['service']) ?>
                                 </td>
                                 <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">
@@ -1477,7 +1476,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
         </div>
 
         <?php if ($events === []) { ?>
-            <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
+            <div class="empty-state">
                 No events recorded.
             </div>
         <?php } else { ?>
@@ -1485,7 +1484,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <table class="dash-table">
                     <thead>
                         <tr>
-                            <th style="width: 45px;">#</th>
+                            <th class="col-45">#</th>
                             <th>Event Name</th>
                             <th>Caller Location</th>
                         </tr>
@@ -1494,7 +1493,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         <?php foreach ($events as $idx => $ev) { ?>
                             <tr data-flt-item data-app="<?= ExceptionTrace::isVendor($ev['file']) ? '0' : '1' ?>">
                                 <td class="text-muted font-mono"><?= $idx + 1 ?></td>
-                                <td style="font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text-primary);">
+                                <td class="mono-strong-125">
                                     <?= Template::e($ev['name']) ?>
                                 </td>
                                 <td style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted);">
@@ -1521,7 +1520,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 <span>Raw Collector Dumps</span>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <div class="flex-row">
                 <select id="collector-select" style="background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-primary); padding: 0.38rem 0.65rem; font-size: 12px; outline: none; cursor: pointer;">
                     <?php foreach ($collectorNames as $cName) { ?>
                         <option value="<?= Template::e($cName) ?>">
@@ -1540,7 +1539,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
             </div>
         </div>
 
-        <div style="padding: 1rem;">
+        <div class="pad-1">
             <?php foreach ($collectorNames as $idx => $cName) { ?>
                 <div class="raw-collector-block" id="col-block-<?= Template::e(md5($cName)) ?>" style="<?= $idx > 0 ? 'display: none;' : '' ?>">
                     <pre style="max-height: 600px;" id="col-pre-<?= Template::e(md5($cName)) ?>"><?= Template::e($view->raw($cName)) ?></pre>

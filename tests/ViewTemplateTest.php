@@ -131,7 +131,7 @@ final class ViewTemplateTest extends TestCase
         self::assertStringContainsString('Replay as cURL', $html);
         self::assertStringContainsString('id="curl-secrets"', $html);
         self::assertSame(1, substr_count($html, 'Cookie: SESSID=[REDACTED]'), 'the shown command is masked');
-        self::assertSame(1, preg_match('/<pre class="curl-cmd" id="curl-full" hidden[^>]*>[^<]*topsecret/', $html), 'the real one is there but hidden');
+        self::assertSame(1, preg_match('/<pre class="[^"]*\bcurl-cmd\b[^"]*" id="curl-full" hidden[^>]*>[^<]*topsecret/', $html), 'the real one is there but hidden');
     }
 
     public function testNoCredentialToggleWhenThereAreNoCredentials(): void

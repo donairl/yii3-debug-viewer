@@ -97,7 +97,7 @@ final class ExceptionTrace
     }
 
     /**
-     * @param array{index: int, call: string} $frame
+     * @param array{index: int, call: string, ...<string, mixed>} $frame
      */
     public static function isThrowSite(array $frame): bool
     {
@@ -160,7 +160,7 @@ final class ExceptionTrace
             }
         }
 
-        return array_values($frames);
+        return $frames;
     }
 
     private static function str(mixed $value): string

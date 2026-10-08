@@ -270,13 +270,8 @@ final class DumpView
      */
     public function services(): array
     {
-        $services = $this->collector(self::SERVICE);
-        if (!is_array($services)) {
-            return [];
-        }
-
         $rows = [];
-        foreach ($services as $s) {
+        foreach ($this->collector(self::SERVICE) as $s) {
             if (!is_array($s)) {
                 continue;
             }
@@ -369,30 +364,7 @@ final class DumpView
 
     public static function highlightSql(string $sql): string
     {
-        $escaped = htmlspecialchars($sql, ENT_QUOTES, 'UTF-8');
-        
-        // Highlight strings ('value')
-        $escaped = (string)preg_replace('/(&#039;[^&#039;]*&#039;|\x27[^\x27]*\x27|&quot;[^&]*&quot;)/', '<span class="sql-str">$1</span>', $escaped);
-        
-        // Highlight parameter placeholders (:param)
-        $escaped = (string)preg_replace('/(:[a-zA-Z0-9_]+)/', '<span class="sql-param">$1</span>', $escaped);
-        
-        // Highlight numeric literals
-        $escaped = (string)preg_replace('/\b(\d+(?:\.\d+)?)\b/', '<span class="sql-num">$1</span>', $escaped);
-
-        // Highlight SQL keywords
-        $keywords = [
-            'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN',
-            'INNER JOIN', 'OUTER JOIN', 'CROSS JOIN', 'ON', 'ORDER BY', 'GROUP BY', 'HAVING', 'LIMIT',
-            'OFFSET', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'AS', 'IN', 'NOT IN',
-            'IS NULL', 'IS NOT NULL', 'LIKE', 'ILIKE', 'BETWEEN', 'CASE', 'WHEN',
-            'THEN', 'ELSE', 'END', 'DISTINCT', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX',
-            'ASC', 'DESC', 'UNION', 'ALL', 'EXISTS', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'INDEX'
-        ];
-        $pattern = '/\b(' . implode('|', array_map('preg_quote', $keywords)) . ')\b/i';
-        $escaped = (string)preg_replace_callback($pattern, static fn($m) => '<span class="sql-kw">' . strtoupper($m[0]) . '</span>', $escaped);
-
-        return $escaped;
+        return SqlHighlighter::html($sql);
     }
 
     public static function formatBytes(int|float $bytes): string
@@ -401,13 +373,14 @@ final class DumpView
             return '0 B';
         }
         $units = ['B', 'KB', 'MB', 'GB'];
+        $last = count($units) - 1;
         $i = 0;
         $val = (float)$bytes;
-        while ($val >= 1024 && $i < count($units) - 1) {
+        while ($val >= 1024 && $i < $last) {
             $val /= 1024;
             $i++;
         }
-        return number_format($val, $i === 0 ? 0 : 2) . ' ' . $units[$i];
+        return number_format($val, $i === 0 ? 0 : 2) . ' ' . $units[min($i, $last)];
     }
 
     private function collector(string $name): array

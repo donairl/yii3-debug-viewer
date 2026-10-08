@@ -17,11 +17,6 @@ final class DumpReader
         private readonly bool $redact = true,
     ) {}
 
-    public function redactionEnabled(): bool
-    {
-        return $this->redact;
-    }
-
     /**
      * @param bool $reveal Show real values. Ignored when redaction is switched off, which shows them anyway.
      *

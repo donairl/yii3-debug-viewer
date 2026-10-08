@@ -126,7 +126,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
 
 <div class="dash-panel">
     <!-- Toolbar: Search, Filters & Stats -->
-    <div class="dash-panel-header" style="flex-wrap: wrap;">
+    <div class="wrap dash-panel-header">
         <div class="dash-panel-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="8" y1="6" x2="21" y2="6"></line>
@@ -158,7 +158,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
             </div>
 
             <!-- Method Filter Selector -->
-            <select id="method-filter" style="background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-secondary); padding: 0.38rem 0.65rem; font-size: 12.5px; outline: none; cursor: pointer;">
+            <select id="method-filter" class="form-select">
                 <option value="ALL">All Methods</option>
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
@@ -167,7 +167,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
             </select>
 
             <!-- Status Filter Selector -->
-            <select id="status-filter" style="background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-secondary); padding: 0.38rem 0.65rem; font-size: 12.5px; outline: none; cursor: pointer;">
+            <select id="status-filter" class="form-select">
                 <option value="ALL">All Status</option>
                 <option value="2XX">2xx Success</option>
                 <option value="3XX">3xx Redirect</option>
@@ -179,7 +179,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
 
     <?php if ($rows === []) { ?>
         <div style="padding: 4rem 2rem; text-align: center;">
-            <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--bg-surface); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--text-muted);">
+            <div class="empty-icon">
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <path d="M8 12h8"></path>
@@ -187,7 +187,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
             </div>
             <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 0.4rem; color: var(--text-primary);">No Request Dumps Found</h3>
             <p style="color: var(--text-muted); font-size: 13px; max-width: 440px; margin: 0 auto 1.25rem;">Make any HTTP request to the application, then refresh this page to inspect complete execution metrics.</p>
-            <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: var(--bg-surface); padding: 0.4rem 0.9rem; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); border: 1px solid var(--border-subtle);">
+            <div class="hint-pill">
                 <span>Reset anytime:</span>
                 <code>php yii debug:reset</code>
             </div>
@@ -224,7 +224,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                     <tr>
                         <th style="width: 85px;" data-sort="time" data-sort-first="desc">Time</th>
                         <th style="width: 75px;" data-sort="method" data-sort-first="asc">Method</th>
-                        <th style="width: 100px;" data-sort="status" data-sort-first="desc">Status</th>
+                        <th data-sort="status" data-sort-first="desc" class="col-100">Status</th>
                         <th data-sort="path" data-sort-first="asc">Path & Action</th>
                         <th style="text-align: right; width: 90px;" data-sort="queries" data-sort-first="desc">Queries</th>
                         <th style="text-align: right; width: 85px;" data-sort="logs" data-sort-first="desc">Logs</th>
@@ -307,7 +307,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             </td>
 
                             <!-- Database Queries -->
-                            <td style="text-align: right;">
+                            <td class="ta-right">
                                 <?php if ((int)$row['queries'] > 0) { ?>
                                     <span class="dash-badge" style="background: var(--bg-surface-subtle);">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -323,7 +323,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             </td>
 
                             <!-- Logs -->
-                            <td style="text-align: right;">
+                            <td class="ta-right">
                                 <?php if ((int)$row['logs'] > 0) { ?>
                                     <span class="dash-badge">
                                         <?= Template::e($row['logs']) ?>
@@ -334,14 +334,14 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             </td>
 
                             <!-- Duration -->
-                            <td style="text-align: right; white-space: nowrap;">
+                            <td class="ta-right-nowrap">
                                 <span style="font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: <?= $dur > 500 ? 'var(--c-err)' : ($dur > 200 ? 'var(--c-warn)' : 'var(--text-primary)') ?>;">
                                     <?= Template::e(Template::formatMs($dur)) ?>
                                 </span>
                             </td>
 
                             <!-- Memory -->
-                            <td style="text-align: right; white-space: nowrap;">
+                            <td class="ta-right-nowrap">
                                 <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">
                                     <?= Template::e(number_format((float)$row['memoryMb'], 2)) ?> MB
                                 </span>

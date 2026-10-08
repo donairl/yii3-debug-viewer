@@ -553,6 +553,8 @@ $export ??= null;
             color: #38bdf8;
             font-weight: 600;
         }
+        .sql-id { color: var(--text-primary); }
+        .sql-com { color: var(--text-muted); font-style: italic; }
         .sql-num {
             color: #fbbf24;
         }
@@ -563,6 +565,7 @@ $export ??= null;
         [data-theme="light"] .sql-str { color: #059669; }
         [data-theme="light"] .sql-param { color: #0284c7; }
         [data-theme="light"] .sql-num { color: #d97706; }
+        [data-theme="light"] .sql-id { color: #1e293b; }
         [data-theme="light"] .sql-ident { color: #1e293b; }
 
         /* Toast notifications */
@@ -670,6 +673,55 @@ $export ??= null;
         .dash-btn-danger { color: var(--c-err); border-color: var(--c-err-border); }
         .dash-btn-danger:hover { background: var(--c-err-bg); color: var(--c-err); }
         form.inline { display: inline; margin: 0; }
+
+        /* Component classes extracted from template inline styles. `.dash-main` in front keeps them above the table rules, as inline styles were. */
+        .dash-main .k-label { font-weight: 600; color: var(--text-muted); }
+        .dash-main .sub-heading { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.6rem; }
+        .dash-main .mono-strong { font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); }
+        .dash-main .mono-strong-wrap { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-primary); word-break: break-all; }
+        .dash-main .mono-strong-125 { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+        .dash-main .mono { font-family: var(--font-mono); }
+        .dash-main .mono-cell { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+        .dash-main .meta-inline { font-size: 12px; font-weight: 400; }
+        .dash-main .bold { font-weight: 600; }
+        .dash-main .pad-1 { padding: 1rem; }
+        .dash-main .pad-panel { padding: 1rem 1.25rem; }
+        .dash-main .empty-state { padding: 3rem; text-align: center; color: var(--text-muted); }
+        .dash-main .empty-box { padding: 3rem; text-align: center; }
+        .dash-main .hint { margin-top: 0.6rem; font-size: 12px; }
+        .dash-main .muted { color: var(--text-muted); }
+        .dash-main .btn-xs { padding: 2px 9px; font-size: 11.5px; }
+        .dash-main .ta-right { text-align: right; }
+        .dash-main .ta-right-nowrap { text-align: right; white-space: nowrap; }
+        .dash-main .wrap { flex-wrap: wrap; }
+        .dash-main .col-45 { width: 45px; }
+        .dash-main .col-100 { width: 100px; }
+        .dash-main .col-200 { width: 200px; }
+        .dash-main .stat-chip { display: flex; align-items: center; gap: 0.5rem; background: var(--bg-surface); padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); font-family: var(--font-mono); font-size: 12px; }
+        .dash-main .flex-row { display: flex; align-items: center; gap: 0.6rem; }
+        .dash-main .stack-lg { display: flex; flex-direction: column; gap: 1.5rem; }
+        .dash-main .pre-flush { margin: 0; white-space: pre-wrap; word-break: break-all; }
+        .dash-main .table-box { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 1rem; }
+        .dash-main .form-select { background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-secondary); padding: 0.38rem 0.65rem; font-size: 12.5px; outline: none; cursor: pointer; }
+        .dash-main .bar-between { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+        .dash-main .bar-between-mb { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .dash-main .bar-between-mb-sm { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+        .dash-main .title-card { padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; flex-wrap: wrap; }
+        .dash-main .req-path { font-size: 1.15rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); word-break: break-all; }
+        .dash-main .tab-strip { display: flex; align-items: center; gap: 0.35rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 2px; }
+        .dash-main .section-title { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem; }
+        .dash-main .exception-message { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+        .dash-main .exception-class { font-weight: 700; color: var(--c-err); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.5rem; }
+        .dash-main .mini-heading { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .dash-main .param-chip { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 3px 8px; font-family: var(--font-mono); font-size: 11.5px; }
+        .dash-main .caller-line { margin-top: 0.65rem; font-size: 11.5px; color: var(--text-muted); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.35rem; }
+        .dash-main .sql-peek { font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); max-width: 800px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dash-main .context-pre { margin: 0.25rem 0 0; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 480px; overflow: auto; }
+        .dash-main .check-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+        .dash-main .notice-warn { border-color: var(--c-warn-border); background: var(--c-warn-bg); padding: 0.85rem 1rem; margin-bottom: 1.25rem; color: var(--text-primary); }
+        .dash-main .empty-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--bg-surface); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--text-muted); }
+        .dash-main .hint-pill { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--bg-surface); padding: 0.4rem 0.9rem; border-radius: var(--radius-sm); font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+        .dash-main .k-label { font-weight: 600; color: var(--text-muted); }
     </style>
 </head>
 <body>

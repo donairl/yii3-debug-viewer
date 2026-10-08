@@ -176,6 +176,6 @@ final class QueryAnalyzer
         $counts = array_count_values($callers);
         arsort($counts);
 
-        return (string)array_key_first($counts);
+        return array_key_first($counts);
     }
 }

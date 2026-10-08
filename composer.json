@@ -48,6 +48,7 @@
         }
     },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "psalm": "psalm --no-cache --threads=1"
     }
 }
