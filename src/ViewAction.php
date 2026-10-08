@@ -17,6 +17,7 @@ final readonly class ViewAction
         private DumpStorage $storage,
         private Template $template,
         private CurrentRoute $currentRoute,
+        private EditorLinker $editor,
         private UrlGeneratorInterface $urlGenerator,
         private bool $enabled = false,
     ) {}
@@ -45,6 +46,7 @@ final readonly class ViewAction
             'meta' => $dump['meta'],
             'summary' => $dump['summary'],
             'view' => new DumpView($dump['data']),
+            'editor' => $this->editor,
         ]);
     }
 }

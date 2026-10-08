@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dxn\DebugViewer\DumpStorage;
+use Dxn\DebugViewer\EditorLinker;
 use Dxn\DebugViewer\IndexAction;
 use Dxn\DebugViewer\Template;
 use Dxn\DebugViewer\ViewAction;
@@ -23,6 +24,14 @@ return [
     ],
 
     Template::class => Template::class,
+
+    EditorLinker::class => [
+        'class' => EditorLinker::class,
+        '__construct()' => [
+            'editor' => (string)($config['editor'] ?? ''),
+            'pathMap' => (array)($config['pathMap'] ?? []),
+        ],
+    ],
 
     IndexAction::class => [
         'class' => IndexAction::class,

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dxn\DebugViewer\DumpView;
+use Dxn\DebugViewer\EditorLinker;
 use Dxn\DebugViewer\ExceptionTrace;
 use Dxn\DebugViewer\Template;
 
@@ -10,6 +11,7 @@ use Dxn\DebugViewer\Template;
  * @var array<string, mixed> $meta
  * @var array<string, mixed> $summary
  * @var DumpView $view
+ * @var EditorLinker $editor
  * @var string $indexUrl
  */
 
@@ -52,8 +54,22 @@ $timeline = $view->timeline();
 /** Short, single-line form of a statement for headings. */
 $shorten = static fn(string $text, int $max = 140): string => mb_strimwidth((string)preg_replace('/\s+/', ' ', $text), 0, $max, '…');
 
+/** A location as text, wrapped in an open-in-editor link when the editor is configured and the path is absolute. */
+$linkTo = static function (string $text, ?string $url): string {
+    if ($url === null) {
+        return Template::e($text);
+    }
+
+    return '<a class="loc-link" href="' . Template::e($url) . '" title="Open in editor">' . Template::e($text) . '</a>';
+};
+/** For a `path:line` string. */
+$locationHtml = static fn(string $location): string => $linkTo($location, $editor->urlForLocation($location));
+/** For a file and line kept apart. */
+$fileLineHtml = static fn(string $file, string $line): string
+    => $linkTo($file . ($line !== '' ? ':' . $line : ''), $editor->url($file, $line));
+
 /** Query insight cards: shared by the Overview and Database tabs. */
-$renderInsights = static function () use ($insights, $shorten): void {
+$renderInsights = static function () use ($insights, $shorten, $locationHtml): void {
     foreach ($insights['groups'] as $g) {
         $isNPlusOne = $g['kind'] === 'n+1';
         ?>
@@ -75,7 +91,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                     ? 'Same statement run ' . (int)$g['count'] . ' times with different values. Load it once with a JOIN or <code>IN (...)</code>.'
                     : 'Identical statement and values run ' . (int)$g['count'] . ' times. Reuse the first result.' ?>
                 <?php if ($g['caller'] !== '') { ?>
-                    <span class="font-mono">Caller: <?= Template::e($g['caller']) ?></span>
+                    <span class="font-mono">Caller: <?= $locationHtml($g['caller']) ?></span>
                 <?php } ?>
             </div>
         </div>
@@ -301,6 +317,9 @@ $renderInsights = static function () use ($insights, $shorten): void {
         border-color: var(--c-warn-border);
     }
 
+    .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
+    .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
     /* Query insights */
     .insight {
         padding: 0.85rem 1rem;
@@ -446,7 +465,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
             <div style="padding: 0.85rem 1rem;">
                 <div style="font-weight: 600; color: var(--text-primary);"><?= Template::e($first['message']) ?></div>
                 <?php if ($first['file'] !== '') { ?>
-                    <div class="font-mono text-muted" style="font-size: 12px; margin-top: 0.3rem;"><?= Template::e($first['file']) ?>:<?= Template::e($first['line']) ?></div>
+                    <div class="font-mono text-muted" style="font-size: 12px; margin-top: 0.3rem;"><?= $fileLineHtml((string)$first['file'], (string)$first['line']) ?></div>
                 <?php } ?>
             </div>
         </div>
@@ -614,7 +633,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                                     </div>
                                     <?php if ($q['line'] !== '') { ?>
                                         <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">
-                                            <?= Template::e($q['line']) ?>
+                                            <?= $locationHtml((string)$q['line']) ?>
                                         </div>
                                     <?php } ?>
                                 </td>
@@ -801,7 +820,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                                     <polyline points="14 2 14 8 20 8"></polyline>
                                 </svg>
                                 <span>Caller:</span>
-                                <span style="color: var(--text-secondary);"><?= Template::e($query['line']) ?></span>
+                                <span style="color: var(--text-secondary);"><?= $locationHtml((string)$query['line']) ?></span>
                             </div>
                         <?php } ?>
                     </div>
@@ -828,7 +847,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                     $copyText .= '#' . $f['index'] . ' ' . ($f['file'] !== '' ? $f['file'] . ($f['line'] !== '' ? '(' . $f['line'] . ')' : '') . ': ' : '') . $f['call'] . "\n";
                 }
                 $segments = ExceptionTrace::segments($ex['frames']);
-                $renderFrame = static function (array $f) use ($ex): void {
+                $renderFrame = static function (array $f) use ($ex, $fileLineHtml): void {
                     $isThrow = ExceptionTrace::isThrowSite($f);
                     $cls = $isThrow ? 'is-throw' : ($f['vendor'] ? 'is-vendor' : 'is-app');
                     ?>
@@ -837,7 +856,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                         <div>
                             <div class="trace-call"><?= Template::e($isThrow ? $ex['class'] . ' ' . $f['call'] : $f['call']) ?></div>
                             <?php if ($f['file'] !== '') { ?>
-                                <div class="trace-loc"><?= Template::e($f['file']) ?><?= $f['line'] !== '' ? ':' . Template::e($f['line']) : '' ?></div>
+                                <div class="trace-loc"><?= $fileLineHtml($f['file'], $f['line']) ?></div>
                             <?php } ?>
                         </div>
                     </div>
@@ -931,7 +950,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                                 <td>
                                     <pre style="margin: 0; padding: 0.5rem 0.75rem; font-size: 12px; white-space: pre-wrap;"><?= Template::e($log['message']) ?></pre>
                                     <?php if ($log['line'] !== null) { ?>
-                                        <div class="text-muted font-mono" style="padding: 0 0.75rem; font-size: 11px;"><?= Template::e($log['line']) ?></div>
+                                        <div class="text-muted font-mono" style="padding: 0 0.75rem; font-size: 11px;"><?= $locationHtml($log['line']) ?></div>
                                     <?php } ?>
                                     <?php if ($log['context'] !== null) { ?>
                                         <details style="padding: 0.25rem 0.75rem 0.5rem;"<?= strlen($log['context']) <= 800 ? ' open' : '' ?>>
@@ -1224,7 +1243,7 @@ $renderInsights = static function () use ($insights, $shorten): void {
                                     <?= Template::e($ev['name']) ?>
                                 </td>
                                 <td style="font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted);">
-                                    <?= Template::e($ev['line'] !== '' ? $ev['line'] : ($ev['file'] ?? '-')) ?>
+                                    <?= $ev['line'] !== '' ? $locationHtml($ev['line']) : Template::e($ev['file'] ?? '-') ?>
                                 </td>
                             </tr>
                         <?php } ?>

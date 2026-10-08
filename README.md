@@ -78,8 +78,30 @@ data:
     'enabled' => Environment::isDev(),
     'dumpPath' => '@runtime/debug',  // optional
     'listLimit' => 100,              // optional
+    'editor' => 'phpstorm',          // optional, see below
+    'pathMap' => ['/app' => '/home/me/project'],   // optional
 ],
 ```
+
+### Open in editor
+
+With `editor` set, every `file:line` the viewer shows (query callers, log
+lines, exception frames, events) becomes a link that opens the file at that
+line. `editor` is one of `phpstorm`, `idea`, `vscode`, `cursor`, `sublime`,
+`textmate`, or a custom URL with `{file}` and `{line}` placeholders, for
+example `'myeditor://open?path={file}&line={line}'`. Left empty, locations
+stay plain text.
+
+The links use your editor's URL handler, so the editor must be installed on
+the machine whose browser you view the page in (for PhpStorm, JetBrains
+Toolbox registers `phpstorm://`).
+
+Dumps record paths as the application saw them. When the app runs in a
+container or VM, map those prefixes to paths on the machine running the
+editor with `pathMap`: `['/app' => '/home/me/project']`. The longest matching
+prefix wins and only whole directories match (`/app` does not touch
+`/application`). Paths that are not absolute, such as `[internal function]`,
+are never linked.
 
 Register the routes. They are not shipped as a config-plugin `routes` file on
 purpose: an application served from a subpath registers its routes inside a
