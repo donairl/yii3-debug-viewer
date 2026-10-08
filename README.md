@@ -43,10 +43,9 @@ the raw collector summary. On top of that:
   request.
 - **Replay as cURL.** The Request tab rebuilds the recorded request as a
   `curl` command you can paste into a shell: method, URL, headers and body,
-  quoted for POSIX shells. Credentials are masked by default (Authorization
-  and cookie values, `password`/`token`/`secret`/`api_key` style fields in
-  the URL, form body and JSON body) and a checkbox includes the real
-  values. Headers curl sets itself (`Host`, `Content-Length`,
+  quoted for POSIX shells. Credentials are masked by default (see
+  *Sensitive values*) and a checkbox includes the real values once you have
+  revealed them. Headers curl sets itself (`Host`, `Content-Length`,
   `Accept-Encoding`) are dropped. Binary bodies are left out, and multipart
   bodies are not masked, which the panel says.
 - **Stack traces.** Each exception (and its `previous` chain) is listed as
@@ -111,6 +110,8 @@ data:
     'dumpPath' => '@runtime/debug',  // optional
     'listLimit' => 100,              // optional
     'maxDumpSize' => 16 * 1024 * 1024,   // optional, bytes; 0 = no limit
+    'redact' => true,                // optional, see below
+    'redactKeys' => ['ssn'],         // optional, extra sensitive names
     'editor' => 'phpstorm',          // optional, see below
     'pathMap' => ['/app' => '/home/me/project'],   // optional
 ],
@@ -124,6 +125,29 @@ tabs with no explanation.
 
 Dumps are listed newest first by request id (yii-debug ids start with the
 time), so listing and opening a dump do not scan the whole dump directory.
+
+### Sensitive values
+
+The request view masks credentials before it renders anything, so the real
+values never reach the page (and so not a screenshot, a screen share or a
+copy-paste). A banner says how many were masked and links to `?reveal=1` on
+the same URL, which shows the real values for that view and offers to mask
+them again.
+
+What is masked, by name: values of keys, headers, query parameters and
+form/JSON fields whose name contains `password`, `token`, `secret`,
+`api_key`, `cookie`, `authorization`, `csrf` and similar words (camelCase and
+punctuation are split, so `apiToken` and `X-CSRF-Token` match while
+`compass` and `bypass` do not). It covers the raw request and response
+(headers, cookies, URL query, form and JSON bodies), log context, bound SQL
+parameters and the literals compared to a sensitive column
+(`password = 'x'`), exception messages, bearer tokens in any text, and the
+arguments of stack frames. Names stay, values become `[REDACTED]`.
+
+This is best effort: a secret under an innocuous name, inside free text, or in
+a multipart upload stays visible. Add names with `redactKeys`, and turn the
+whole thing off with `'redact' => false`. The request list shows no request
+data, so it is unaffected.
 
 ### Open in editor
 

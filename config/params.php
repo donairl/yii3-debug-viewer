@@ -9,6 +9,11 @@ return [
         'enabled' => false,
         'dumpPath' => '@runtime/debug',
         'listLimit' => 100,
+        // Mask passwords, tokens, cookies and similar in what the request view
+        // shows. `?reveal=1` on the view URL shows the real values.
+        'redact' => true,
+        // More words that make a name sensitive, e.g. ['ssn', 'card_number'].
+        'redactKeys' => [],
         // data.json larger than this many bytes is not decoded (decoding needs
         // several times the file size in memory). 0 removes the limit.
         'maxDumpSize' => 16 * 1024 * 1024,

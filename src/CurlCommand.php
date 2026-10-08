@@ -12,8 +12,6 @@ use function is_array;
 use function mb_check_encoding;
 use function parse_url;
 use function preg_match;
-use function preg_replace;
-use function preg_replace_callback;
 use function str_contains;
 use function str_replace;
 use function sprintf;
@@ -21,29 +19,24 @@ use function str_starts_with;
 use function strlen;
 use function strtoupper;
 use function strtolower;
-use function urldecode;
 
 /**
  * Rebuilds a recorded request as a `curl` command, to replay it from a shell.
  *
- * By default credentials are masked: Authorization and similar headers, cookie
- * values, and password/token-like fields in the URL, form and JSON body. The
- * names stay, so the command shows what was sent and where to put a real value.
+ * By default credentials are masked by the Redactor: Authorization and similar
+ * headers, cookie values, and password/token-like fields in the URL, form and
+ * JSON body. The names stay, so the command shows what was sent and where to
+ * put a real value.
  */
 final class CurlCommand
 {
-    public const MASK = '[REDACTED]';
-
-    /** Matches names of headers, parameters and fields that carry credentials. */
-    private const SENSITIVE = '/(authorization|cookie|pass(?:word|wd)?|secret|token|api[-_]?key|csrf|xsrf|credential)/i';
-
     /** Sent by curl itself, or stale once the command is replayed. */
     private const DROPPED_HEADERS = ['host', 'content-length', 'connection', 'transfer-encoding', 'expect', 'accept-encoding'];
 
     /**
      * @return array{command: string, notes: list<string>}|null Null when the dump holds no request to rebuild.
      */
-    public static function fromView(DumpView $view, bool $redact = true): ?array
+    public static function fromView(DumpView $view, bool $redact = true, ?Redactor $redactor = null): ?array
     {
         $request = $view->request();
         $parsed = $view->parsedRequest();
@@ -61,6 +54,7 @@ final class CurlCommand
             $parsed['headers'],
             $parsed['body'],
             $redact,
+            $redactor,
         );
     }
 
@@ -69,8 +63,9 @@ final class CurlCommand
      *
      * @return array{command: string, notes: list<string>}
      */
-    public static function build(string $method, ?string $url, array $headers, string $body = '', bool $redact = true): array
+    public static function build(string $method, ?string $url, array $headers, string $body = '', bool $redact = true, ?Redactor $redactor = null): array
     {
+        $redactor ??= new Redactor();
         $notes = [];
         $method = strtoupper($method);
 
@@ -94,12 +89,12 @@ final class CurlCommand
                 $contentType = $values[0] ?? '';
             }
             foreach ($values as $value) {
-                $args[] = '-H ' . self::quote($name . ': ' . ($redact ? self::maskHeader($name, $value) : $value));
+                $args[] = '-H ' . self::quote($name . ': ' . ($redact ? $redactor->header($name, $value) : $value));
             }
         }
 
         if ($redact) {
-            $url = self::maskUrl($url);
+            $url = $redactor->url($url);
         }
 
         $line = [self::quote($url)];
@@ -122,7 +117,7 @@ final class CurlCommand
                 if ($redact && str_contains(strtolower($contentType), 'multipart/')) {
                     $notes[] = 'Multipart bodies are not masked: check the fields before sharing this command.';
                 }
-                $line[] = '--data-raw ' . self::quote($redact ? self::maskBody($contentType, $body) : $body);
+                $line[] = '--data-raw ' . self::quote($redact ? $redactor->body($contentType, $body) : $body);
             }
         }
 
@@ -167,65 +162,6 @@ final class CurlCommand
         $urlHost = strtolower(($parts['host'] ?? '') . (isset($parts['port']) ? ':' . $parts['port'] : ''));
 
         return $urlHost !== '' && strtolower($hostHeader[0] ?? '') !== $urlHost;
-    }
-
-    private static function maskHeader(string $name, string $value): string
-    {
-        if (preg_match(self::SENSITIVE, $name) !== 1) {
-            return $value;
-        }
-
-        if (strtolower($name) === 'cookie') {
-            return (string)preg_replace_callback(
-                '/(^|;\s*)([^=;]+)=([^;]*)/',
-                static fn(array $m): string => $m[1] . $m[2] . '=' . self::MASK,
-                $value,
-            );
-        }
-
-        // "Bearer abc" keeps the scheme, which is useful and not secret
-        if (preg_match('/^([A-Za-z][\w.-]*)\s+\S/', $value, $m) === 1 && strtolower($name) !== 'x-api-key') {
-            return $m[1] . ' ' . self::MASK;
-        }
-
-        return self::MASK;
-    }
-
-    private static function maskUrl(string $url): string
-    {
-        return (string)preg_replace_callback(
-            '/([?&])([^=&#]+)=([^&#]*)/',
-            static fn(array $m): string => preg_match(self::SENSITIVE, urldecode($m[2])) === 1
-                ? $m[1] . $m[2] . '=%5BREDACTED%5D'
-                : $m[0],
-            $url,
-        );
-    }
-
-    private static function maskBody(string $contentType, string $body): string
-    {
-        $type = strtolower($contentType);
-
-        if (str_contains($type, 'json')) {
-            // String values only; layout and everything else stays byte for byte
-            return (string)preg_replace_callback(
-                '/("(?:[^"\\\\]|\\\\.)*")(\s*:\s*)"(?:[^"\\\\]|\\\\.)*"/',
-                static fn(array $m): string => preg_match(self::SENSITIVE, $m[1]) === 1 ? $m[1] . $m[2] . '"' . self::MASK . '"' : $m[0],
-                $body,
-            );
-        }
-
-        if (str_contains($type, 'x-www-form-urlencoded')) {
-            return (string)preg_replace_callback(
-                '/(^|&)([^=&]+)=([^&]*)/',
-                static fn(array $m): string => preg_match(self::SENSITIVE, urldecode($m[2])) === 1
-                    ? $m[1] . $m[2] . '=%5BREDACTED%5D'
-                    : $m[0],
-                $body,
-            );
-        }
-
-        return $body;
     }
 
     /**

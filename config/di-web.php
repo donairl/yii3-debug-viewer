@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Dxn\DebugViewer\DumpStorage;
 use Dxn\DebugViewer\EditorLinker;
 use Dxn\DebugViewer\IndexAction;
+use Dxn\DebugViewer\Redactor;
 use Dxn\DebugViewer\Template;
 use Dxn\DebugViewer\ViewAction;
 use Yiisoft\Aliases\Aliases;
@@ -26,6 +27,13 @@ return [
 
     Template::class => Template::class,
 
+    Redactor::class => [
+        'class' => Redactor::class,
+        '__construct()' => [
+            'extraWords' => array_values(array_map('strval', (array)($config['redactKeys'] ?? []))),
+        ],
+    ],
+
     EditorLinker::class => [
         'class' => EditorLinker::class,
         '__construct()' => [
@@ -46,6 +54,7 @@ return [
         'class' => ViewAction::class,
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
+            'redact' => (bool)($config['redact'] ?? true),
         ],
     ],
 ];

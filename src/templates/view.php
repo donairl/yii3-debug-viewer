@@ -15,6 +15,7 @@ use Dxn\DebugViewer\Template;
  * @var DumpView $view
  * @var EditorLinker $editor
  * @var string|null $warning
+ * @var array{enabled: bool, revealed: bool, masked: int, toggleUrl: string}|null $redaction
  * @var string $indexUrl
  */
 
@@ -56,6 +57,8 @@ $timeline = $view->timeline();
 $problems = ProblemFinder::find($view, $meta);
 $curlSafe = CurlCommand::fromView($view, true);
 $curlFull = $curlSafe === null ? null : CurlCommand::fromView($view, false);
+$redaction ??= ['enabled' => false, 'revealed' => false, 'masked' => 0, 'toggleUrl' => ''];
+$maskedInView = $redaction['enabled'] && !$redaction['revealed'] && $redaction['masked'] > 0;
 $curlHasSecrets = $curlSafe !== null && $curlFull !== null && $curlSafe['command'] !== $curlFull['command'];
 
 /** Short, single-line form of a statement for headings. */
@@ -205,6 +208,18 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
     </div>
 <?php } ?>
 
+<?php if ($maskedInView) { ?>
+    <div class="redaction-note">
+        <span><b><?= (int)$redaction['masked'] ?></b> sensitive <?= $redaction['masked'] === 1 ? 'value is' : 'values are' ?> masked (passwords, tokens, cookies and similar).</span>
+        <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a>
+    </div>
+<?php } elseif ($redaction['enabled'] && $redaction['revealed']) { ?>
+    <div class="redaction-note redaction-note-open">
+        <span>Sensitive values are <b>shown</b> for this view. Mind what you copy or share.</span>
+        <a href="<?= Template::e($redaction['toggleUrl']) ?>">Mask them</a>
+    </div>
+<?php } ?>
+
 <!-- Tabs Navigation -->
 <div style="display: flex; align-items: center; gap: 0.35rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 2px;">
     <button class="dash-tab active" data-tab="overview">
@@ -349,6 +364,15 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 
     .loc-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--text-muted); }
     .loc-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* Masked-values notice */
+    .redaction-note {
+        display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+        margin-bottom: 1.25rem; padding: 0.55rem 1rem; border-radius: var(--radius-md);
+        background: var(--c-info-bg); border: 1px solid var(--c-info-border); color: var(--text-secondary); font-size: 12.5px;
+    }
+    .redaction-note a { font-weight: 600; white-space: nowrap; }
+    .redaction-note-open { background: var(--c-warn-bg); border-color: var(--c-warn-border); }
 
     /* Problem summary */
     .problem { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 1rem; border-top: 1px solid var(--border-subtle); }
@@ -1104,6 +1128,10 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         <pre class="curl-cmd" id="curl-full" hidden style="margin: 0; white-space: pre-wrap; word-break: break-all;"><?= Template::e($curlFull['command']) ?></pre>
                         <div id="curl-warn" hidden class="text-muted" style="margin-top: 0.6rem; font-size: 12px; color: var(--c-warn);">
                             This command contains real cookies, tokens or passwords. Do not paste it into an issue or a chat.
+                        </div>
+                    <?php } elseif ($maskedInView) { ?>
+                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">
+                            Credentials are masked in this view. <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a> to get a command with the real values.
                         </div>
                     <?php } else { ?>
                         <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">No credentials were found in this request.</div>
