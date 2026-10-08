@@ -590,6 +590,15 @@ $totalProblems = count($exceptions) + $queryErrors;
                                 </td>
                                 <td>
                                     <pre style="margin: 0; padding: 0.5rem 0.75rem; font-size: 12px; white-space: pre-wrap;"><?= Template::e($log['message']) ?></pre>
+                                    <?php if ($log['line'] !== null) { ?>
+                                        <div class="text-muted font-mono" style="padding: 0 0.75rem; font-size: 11px;"><?= Template::e($log['line']) ?></div>
+                                    <?php } ?>
+                                    <?php if ($log['context'] !== null) { ?>
+                                        <details style="padding: 0.25rem 0.75rem 0.5rem;"<?= strlen($log['context']) <= 800 ? ' open' : '' ?>>
+                                            <summary class="text-muted" style="cursor: pointer; font-size: 11.5px;">context (<?= number_format(strlen($log['context'])) ?> bytes)</summary>
+                                            <pre style="margin: 0.25rem 0 0; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; max-height: 480px; overflow: auto;"><?= Template::e($log['context']) ?></pre>
+                                        </details>
+                                    <?php } ?>
                                 </td>
                             </tr>
                         <?php } ?>

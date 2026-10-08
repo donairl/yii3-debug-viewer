@@ -77,7 +77,7 @@ final class DumpView
     }
 
     /**
-     * @return list<array{level: string, message: string, time: ?float}>
+     * @return list<array{level: string, message: string, time: ?float, context: ?string, line: ?string}>
      */
     public function logs(): array
     {
@@ -94,6 +94,12 @@ final class DumpView
                 'level' => (string)($entry['level'] ?? 'info'),
                 'message' => is_scalar($message) ? (string)$message : self::json($message),
                 'time' => isset($entry['time']) ? (float)$entry['time'] : null,
+                // The structured part of the entry (url, ids, response bodies...)
+                // is what makes a message like "Product API responded." useful.
+                'context' => isset($entry['context']) && is_array($entry['context']) && $entry['context'] !== []
+                    ? self::json($entry['context'])
+                    : null,
+                'line' => isset($entry['line']) && is_scalar($entry['line']) ? (string)$entry['line'] : null,
             ];
         }
 
