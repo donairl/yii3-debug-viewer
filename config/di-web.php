@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Dxn\DebugViewer\DeleteAction;
 use Dxn\DebugViewer\DumpReader;
 use Dxn\DebugViewer\DumpStorage;
 use Dxn\DebugViewer\EditorLinker;
@@ -56,6 +57,7 @@ return [
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
             'listLimit' => max(1, (int)($config['listLimit'] ?? 100)),
+            'allowDelete' => (bool)($config['allowDelete'] ?? true),
         ],
     ],
 
@@ -63,6 +65,7 @@ return [
         'class' => ViewAction::class,
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
+            'allowDelete' => (bool)($config['allowDelete'] ?? true),
         ],
     ],
 
@@ -70,6 +73,14 @@ return [
         'class' => ExportAction::class,
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
+        ],
+    ],
+
+    DeleteAction::class => [
+        'class' => DeleteAction::class,
+        '__construct()' => [
+            'enabled' => (bool)$config['enabled'],
+            'allowDelete' => (bool)($config['allowDelete'] ?? true),
         ],
     ],
 ];

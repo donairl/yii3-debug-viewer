@@ -662,6 +662,14 @@ $export ??= null;
         th[data-sort][aria-sort="ascending"]::after { content: ' \25B2'; opacity: 1; color: var(--accent); }
         th[data-sort][aria-sort="descending"]::after { content: ' \25BC'; opacity: 1; color: var(--accent); }
         [hidden] { display: none !important; }
+        .dash-notice {
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+            margin-bottom: 1.25rem; padding: 0.55rem 1rem; border-radius: var(--radius-md);
+            background: var(--c-info-bg); border: 1px solid var(--c-info-border); color: var(--text-secondary); font-size: 12.5px;
+        }
+        .dash-btn-danger { color: var(--c-err); border-color: var(--c-err-border); }
+        .dash-btn-danger:hover { background: var(--c-err-bg); color: var(--c-err); }
+        form.inline { display: inline; margin: 0; }
     </style>
 </head>
 <body>

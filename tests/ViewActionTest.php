@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dxn\DebugViewer\Tests;
 
+use Dxn\DebugViewer\Csrf;
 use Dxn\DebugViewer\DumpReader;
 use Dxn\DebugViewer\DumpStorage;
 use Dxn\DebugViewer\DumpView;
@@ -16,6 +17,7 @@ use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UriInterface;
 use Yiisoft\Aliases\Aliases;
 use Yiisoft\Router\CurrentRoute;
 use Yiisoft\Router\Route;
@@ -26,6 +28,9 @@ final class ViewActionTest extends TestCase
     private const ID = '6ac70ae05b8e1284954720';
 
     private string $root;
+
+    /** @var list<string> Set-Cookie headers of the last render() */
+    private array $cookies = [];
 
     protected function setUp(): void
     {
@@ -64,9 +69,10 @@ final class ViewActionTest extends TestCase
 
     private const SECRETS = ['URLSECRET', 'COOKIESECRET', 'BEARERSECRET123', 'RESPONSESECRET', 'PASSWORDSECRET', 'DBSECRET99'];
 
-    private function render(array $query = [], bool $redact = true): string
+    private function render(array $query = [], bool $redact = true, array $cookies = [], bool $allowDelete = true): string
     {
         $html = '';
+        $this->cookies = [];
         $stream = $this->createMock(StreamInterface::class);
         $stream->method('write')->willReturnCallback(static function (string $s) use (&$html): int {
             $html = $s;
@@ -76,12 +82,20 @@ final class ViewActionTest extends TestCase
         $response = $this->createMock(ResponseInterface::class);
         $response->method('getBody')->willReturn($stream);
         $response->method('withHeader')->willReturnSelf();
+        $response->method('withAddedHeader')->willReturnCallback(function (string $name, $value) use ($response): ResponseInterface {
+            if ($name === 'Set-Cookie') {
+                $this->cookies[] = (string)$value;
+            }
+
+            return $response;
+        });
         $factory = $this->createMock(ResponseFactoryInterface::class);
         $factory->method('createResponse')->willReturn($response);
 
         $urls = $this->createMock(UrlGeneratorInterface::class);
         $urls->method('generate')->willReturnCallback(
             static fn(string $name, array $arguments = [], array $queryParameters = []): string => '/debug' . (isset($arguments['id']) ? '/' . $arguments['id'] : '')
+                . ($name === 'debug.delete' ? '/delete' : '')
                 . ($queryParameters !== [] ? '?' . http_build_query($queryParameters) : ''),
         );
 
@@ -90,6 +104,10 @@ final class ViewActionTest extends TestCase
 
         $request = $this->createMock(ServerRequestInterface::class);
         $request->method('getQueryParams')->willReturn($query);
+        $request->method('getCookieParams')->willReturn($cookies);
+        $uri = $this->createMock(UriInterface::class);
+        $uri->method('getScheme')->willReturn('http');
+        $request->method('getUri')->willReturn($uri);
 
         $action = new ViewAction(
             reader: new DumpReader(new DumpStorage(new Aliases(['@runtime' => $this->root])), new Redactor(), $redact),
@@ -97,7 +115,9 @@ final class ViewActionTest extends TestCase
             currentRoute: $route,
             editor: new EditorLinker(),
             urlGenerator: $urls,
+            csrf: new Csrf(),
             enabled: true,
+            allowDelete: $allowDelete,
         );
 
         $response = $action($request);
@@ -186,5 +206,43 @@ final class ViewActionTest extends TestCase
         self::assertStringNotContainsString('format=json&amp;reveal=1', $masked, 'a masked page never links to a revealed export');
         self::assertStringContainsString('format=json&amp;reveal=1', $revealed);
         self::assertStringContainsString('format=html&amp;reveal=1', $revealed);
+    }
+
+    private const TOKEN = '0123456789abcdef0123456789abcdef';
+
+    public function testDeleteButtonPostsToTheDeleteRouteWithAToken(): void
+    {
+        $html = $this->render();
+
+        self::assertStringContainsString('action="/debug/' . self::ID . '/delete"', $html);
+        self::assertMatchesRegularExpression('/name="_csrf" value="[a-f0-9]{32}"/', $html);
+        self::assertStringContainsString("confirm('Delete this request dump?", $html);
+    }
+
+    public function testAFirstVisitSetsTheCsrfCookieAndTheFormCarriesTheSameToken(): void
+    {
+        $html = $this->render();
+
+        self::assertCount(1, $this->cookies);
+        self::assertMatchesRegularExpression('/^dxn_debug_csrf=([a-f0-9]{32}); Path=\/debug; HttpOnly; SameSite=Strict$/', $this->cookies[0]);
+        preg_match('/dxn_debug_csrf=([a-f0-9]{32})/', $this->cookies[0], $cookie);
+        self::assertStringContainsString('name="_csrf" value="' . $cookie[1] . '"', $html);
+    }
+
+    public function testAnExistingCookieIsKeptNotReissued(): void
+    {
+        $html = $this->render(cookies: [Csrf::COOKIE => self::TOKEN]);
+
+        self::assertSame([], $this->cookies);
+        self::assertStringContainsString('name="_csrf" value="' . self::TOKEN . '"', $html);
+    }
+
+    public function testNoDeleteButtonAndNoCookieWhenDeletingIsOff(): void
+    {
+        $html = $this->render(allowDelete: false);
+
+        self::assertStringNotContainsString('/delete"', $html);
+        self::assertStringNotContainsString('name="_csrf"', $html);
+        self::assertSame([], $this->cookies);
     }
 }

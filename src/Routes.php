@@ -42,6 +42,13 @@ final class Routes
             Route::get($prefix . '/{id:[A-Za-z0-9]+}/export')
                 ->action(ExportAction::class)
                 ->name('debug.export'),
+            // "clear" can never be a request id for the GET route above: that one is a different method
+            Route::post($prefix . '/clear')
+                ->action([DeleteAction::class, 'all'])
+                ->name('debug.clear'),
+            Route::post($prefix . '/{id:[A-Za-z0-9]+}/delete')
+                ->action([DeleteAction::class, 'one'])
+                ->name('debug.delete'),
         ];
     }
 }

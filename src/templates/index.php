@@ -8,7 +8,17 @@ use Dxn\DebugViewer\Template;
  * @var list<array<string, mixed>> $rows
  * @var Closure(string): string $viewUrl
  * @var int $limit
+ * @var bool|null $canDelete
+ * @var string|null $csrf
+ * @var Closure(string): string|null $deleteUrl
+ * @var string|null $clearUrl
+ * @var int|null $deleted How many dumps the last delete removed.
  */
+
+$canDelete ??= false;
+$csrf ??= '';
+$deleted ??= null;
+$clearUrl ??= '';
 
 $listLimit = (int)($limit ?? 100);
 
@@ -35,6 +45,18 @@ foreach ($rows as $r) {
 }
 $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
 ?>
+
+<?php if ($deleted !== null) { ?>
+    <div class="dash-notice">
+        <span>
+            <?php if ($deleted === 0) { ?>
+                Nothing was deleted: the dump was already gone.
+            <?php } else { ?>
+                Deleted <b><?= (int)$deleted ?></b> request <?= $deleted === 1 ? 'dump' : 'dumps' ?>.
+            <?php } ?>
+        </span>
+    </div>
+<?php } ?>
 
 <!-- Metric KPI Cards -->
 <div class="dash-metrics-grid">
@@ -183,9 +205,17 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
             </select>
             <span class="flt-count" id="f-count"></span>
             <button type="button" class="flt-clear" id="f-clear" hidden>Clear</button>
-            <?php if ($totalRequests >= $listLimit) { ?>
-                <span class="text-muted" style="font-size: 11.5px; margin-left: auto;">Newest <?= (int)$listLimit ?> dumps loaded, filters apply to these (<code>listLimit</code>).</span>
-            <?php } ?>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                <?php if ($totalRequests >= $listLimit) { ?>
+                    <span class="text-muted" style="font-size: 11.5px;">Newest <?= (int)$listLimit ?> dumps loaded, filters apply to these (<code>listLimit</code>).</span>
+                <?php } ?>
+                <?php if ($canDelete) { ?>
+                    <form method="post" action="<?= Template::e($clearUrl) ?>" class="inline" onsubmit="return confirm('Delete ALL request dumps? This cannot be undone.');">
+                        <input type="hidden" name="_csrf" value="<?= Template::e($csrf) ?>">
+                        <button type="submit" class="flt-toggle dash-btn-danger" title="Delete every collected request">Delete all</button>
+                    </form>
+                <?php } ?>
+            </div>
         </div>
 
         <div class="dash-table-container">
@@ -200,7 +230,7 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                         <th style="text-align: right; width: 85px;" data-sort="logs" data-sort-first="desc">Logs</th>
                         <th style="text-align: right; width: 100px;" data-sort="duration" data-sort-first="desc">Duration</th>
                         <th style="text-align: right; width: 95px;" data-sort="memory" data-sort-first="desc">Memory</th>
-                        <th style="text-align: center; width: 75px;">Details</th>
+                        <th style="text-align: center; width: <?= $canDelete ? 105 : 75 ?>px;">Details</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -318,13 +348,21 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
                             </td>
 
                             <!-- Action button -->
-                            <td style="text-align: center;">
+                            <td style="text-align: center; white-space: nowrap;">
+                                <div style="display: inline-flex; align-items: center; gap: 0.35rem;">
                                 <a href="<?= Template::e($targetUrl) ?>" class="dash-btn dash-btn-icon" title="View Profile Detail" style="display: inline-flex;">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M5 12h14"></path>
                                         <path d="m12 5 7 7-7 7"></path>
                                     </svg>
                                 </a>
+                                <?php if ($canDelete) { ?>
+                                    <form method="post" action="<?= Template::e($deleteUrl($id)) ?>" class="inline" onsubmit="return confirm('Delete this request dump? This cannot be undone.');">
+                                        <input type="hidden" name="_csrf" value="<?= Template::e($csrf) ?>">
+                                        <button type="submit" class="dash-btn dash-btn-icon dash-btn-danger" title="Delete this dump"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg></button>
+                                    </form>
+                                <?php } ?>
+                                </div>
                             </td>
                         </tr>
                     <?php } ?>
@@ -338,6 +376,17 @@ $avgDuration = $totalRequests > 0 ? $sumDuration / $totalRequests : 0;
 </div>
 
 <script>
+    // The "Deleted N dumps" notice is shown once: take it out of the URL so a reload does not repeat it
+    (function() {
+        try {
+            var u = new URL(window.location.href);
+            if (u.searchParams.has('deleted')) {
+                u.searchParams.delete('deleted');
+                history.replaceState(null, '', u.pathname + u.search + u.hash);
+            }
+        } catch (e) {}
+    })();
+
     // Request list: filters, sorting and deep links. State lives in the query string
     // (?q=&method=&status=&err=1&slow=1&minq=&since=&sort=&dir=) so a filtered view can be bookmarked or shared.
     (function() {

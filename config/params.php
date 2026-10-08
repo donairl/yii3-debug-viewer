@@ -9,6 +9,9 @@ return [
         'enabled' => false,
         'dumpPath' => '@runtime/debug',
         'listLimit' => 100,
+        // Show "delete" buttons and accept the POST requests behind them. yii-debug
+        // already prunes its own history (historySize), so this is for clearing by hand.
+        'allowDelete' => true,
         // Mask passwords, tokens, cookies and similar in what the request view
         // shows. `?reveal=1` on the view URL shows the real values.
         'redact' => true,

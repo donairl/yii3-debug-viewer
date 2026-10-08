@@ -18,6 +18,9 @@ use Dxn\DebugViewer\Template;
  * @var array{enabled: bool, revealed: bool, masked: int, toggleUrl: string}|null $redaction
  * @var array{at: string}|null $export Set when this page is written out as a snapshot file.
  * @var array{json: string, html: string}|null $exportUrls
+ * @var bool|null $canDelete
+ * @var string|null $csrf
+ * @var string|null $deleteUrl
  * @var string $indexUrl
  */
 
@@ -61,6 +64,9 @@ $curlSafe = CurlCommand::fromView($view, true);
 $curlFull = $curlSafe === null ? null : CurlCommand::fromView($view, false);
 $export ??= null;
 $exportUrls ??= null;
+$canDelete ??= false;
+$csrf ??= '';
+$deleteUrl ??= '';
 $redaction ??= ['enabled' => false, 'revealed' => false, 'masked' => 0, 'toggleUrl' => ''];
 $maskedInView = $redaction['enabled'] && !$redaction['revealed'] && $redaction['masked'] > 0;
 $curlHasSecrets = $curlSafe !== null && $curlFull !== null && $curlSafe['command'] !== $curlFull['command'];
@@ -169,6 +175,13 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                     <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['json']) ?>" download title="The request data as one JSON file">JSON</a>
                     <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['html']) ?>" download title="This page as one self-contained HTML file">HTML</a>
                 </span>
+            <?php } ?>
+            <?php if ($export === null && $canDelete) { ?>
+                <span>&middot;</span>
+                <form method="post" action="<?= Template::e($deleteUrl) ?>" class="inline" onsubmit="return confirm('Delete this request dump? This cannot be undone.');">
+                    <input type="hidden" name="_csrf" value="<?= Template::e($csrf) ?>">
+                    <button type="submit" class="dash-btn dash-btn-danger" style="padding: 2px 9px; font-size: 11.5px;" title="Delete this dump and go back to the list">Delete</button>
+                </form>
             <?php } ?>
         </div>
     </div>

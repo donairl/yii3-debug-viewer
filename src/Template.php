@@ -46,6 +46,14 @@ final readonly class Template
     }
 
     /**
+     * Sends the browser elsewhere, as after a form was handled (303: the next request is a GET).
+     */
+    public function redirect(string $location, int $status = 303): ResponseInterface
+    {
+        return $this->responseFactory->createResponse($status)->withHeader('Location', $location);
+    }
+
+    /**
      * A file to save, not a page to show.
      *
      * @param string|null $filename Sent as an attachment when given.

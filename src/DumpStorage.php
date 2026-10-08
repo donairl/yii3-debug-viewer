@@ -7,6 +7,7 @@ namespace Dxn\DebugViewer;
 use Yiisoft\Aliases\Aliases;
 
 use function count;
+use function dirname;
 use function file_get_contents;
 use function filemtime;
 use function filesize;
@@ -14,14 +15,18 @@ use function glob;
 use function is_array;
 use function is_dir;
 use function is_file;
+use function is_link;
 use function json_decode;
 use function json_last_error;
 use function json_last_error_msg;
 use function preg_match;
+use function realpath;
 use function rsort;
 use function scandir;
 use function sprintf;
+use function str_starts_with;
 
+use const DIRECTORY_SEPARATOR;
 use const GLOB_ONLYDIR;
 use const JSON_ERROR_NONE;
 use const SCANDIR_SORT_DESCENDING;
@@ -107,6 +112,38 @@ final class DumpStorage
         ];
     }
 
+    /**
+     * Deletes one dump. False when there is no such dump or it could not be
+     * removed in full.
+     */
+    public function delete(string $id): bool
+    {
+        $dir = $this->findDirectory($id);
+
+        return $dir !== null && is_file($dir . '/summary.json') && $this->removeDump($dir);
+    }
+
+    /**
+     * Deletes every complete dump and returns how many went. Anything else in
+     * the dump directory (other files, folders that are not dumps, a dump that
+     * is still being written and has no summary.json yet) is left alone.
+     */
+    public function clear(): int
+    {
+        $deleted = 0;
+
+        foreach ($this->dateDirectories() as $date) {
+            foreach (scandir($date) ?: [] as $name) {
+                if ($name !== '.' && $name !== '..' && is_file($date . '/' . $name . '/summary.json') && $this->removeDump($date . '/' . $name)) {
+                    $deleted++;
+                }
+            }
+            @rmdir($date); // only succeeds once the date folder is empty
+        }
+
+        return $deleted;
+    }
+
     public static function isValidId(string $id): bool
     {
         return preg_match('/^[A-Za-z0-9]{1,64}$/D', $id) === 1;
@@ -165,6 +202,39 @@ final class DumpStorage
                 yield $date . '/' . $name;
             }
         }
+    }
+
+    /**
+     * Removes a dump folder and the date folder above it once that is empty.
+     * Never follows a link and never leaves the dump directory, so a planted
+     * symlink cannot point a delete at something else.
+     */
+    private function removeDump(string $dir): bool
+    {
+        $base = realpath($this->aliases->get($this->path));
+        $real = realpath($dir);
+        if (is_link($dir) || !is_dir($dir) || $base === false || $real === false || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+            return false;
+        }
+
+        foreach (scandir($dir) ?: [] as $name) {
+            if ($name === '.' || $name === '..') {
+                continue;
+            }
+            $path = $dir . '/' . $name;
+            // a dump is flat files; a folder inside means this is not what yii-debug wrote
+            if (!is_link($path) && is_dir($path)) {
+                return false;
+            }
+            if (!@unlink($path)) {
+                return false;
+            }
+        }
+
+        $removed = @rmdir($dir);
+        @rmdir(dirname($dir));
+
+        return $removed;
     }
 
     /**

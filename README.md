@@ -110,6 +110,7 @@ data:
     'dumpPath' => '@runtime/debug',  // optional
     'listLimit' => 100,              // optional
     'maxDumpSize' => 16 * 1024 * 1024,   // optional, bytes; 0 = no limit
+    'allowDelete' => true,           // optional, see below
     'redact' => true,                // optional, see below
     'redactKeys' => ['ssn'],         // optional, extra sensitive names
     'editor' => 'phpstorm',          // optional, see below
@@ -148,6 +149,26 @@ This is best effort: a secret under an innocuous name, inside free text, or in
 a multipart upload stays visible. Add names with `redactKeys`, and turn the
 whole thing off with `'redact' => false`. The request list shows no request
 data, so it is unaffected.
+
+### Deleting dumps
+
+The request page has a **Delete** button and the list has a trash button per
+row and **Delete all**, each behind a confirmation. yii-debug already prunes
+its own history (`historySize`, 50 by default), so this is for clearing by
+hand. Only complete dumps are removed: other files in the dump directory, a
+dump still being written, and anything reached through a symlink are left
+alone. `'allowDelete' => false` removes the buttons and refuses the requests.
+
+Deleting is `POST` only (`<prefix>/<id>/delete`, `<prefix>/clear`) and has its
+own CSRF protection, with nothing needed from your application: a random token
+in a `HttpOnly; SameSite=Strict` cookie scoped to the viewer's path has to come
+back in the form, and a browser that reports the request as cross-site is
+refused.
+
+If your application already applies a CSRF middleware (such as
+`yiisoft/csrf`) to every POST, it will reject these forms, since they carry
+the viewer's token and not yours. Leave the viewer routes out of that
+middleware, or set `allowDelete` to `false`.
 
 ### Export
 

@@ -216,4 +216,106 @@ final class DumpStorageTest extends TestCase
         self::assertTrue(DumpStorage::isValidId(self::id(1)));
         self::assertFalse(DumpStorage::isValidId('a/b'));
     }
+
+    public function testDeleteRemovesTheDumpAndAnEmptiedDateFolder(): void
+    {
+        $a = self::id(100);
+        $b = self::id(200);
+        $this->dump('2026-10-01', $a);
+        $this->dump('2026-10-02', $b);
+        file_put_contents("$this->root/debug/2026-10-01/$a/objects.json", '{}');
+
+        self::assertTrue($this->storage()->delete($a));
+
+        self::assertDirectoryDoesNotExist("$this->root/debug/2026-10-01/$a");
+        self::assertDirectoryDoesNotExist("$this->root/debug/2026-10-01", 'the date folder went with its last dump');
+        self::assertNull($this->storage()->get($a));
+        self::assertSame($b, $this->storage()->get($b)['id']);
+    }
+
+    public function testDeleteKeepsADateFolderThatStillHasDumps(): void
+    {
+        $this->dump('2026-10-01', self::id(100));
+        $this->dump('2026-10-01', self::id(200));
+
+        self::assertTrue($this->storage()->delete(self::id(100)));
+
+        self::assertDirectoryExists("$this->root/debug/2026-10-01");
+        self::assertCount(1, $this->storage()->list());
+    }
+
+    public function testDeleteIsFalseForMissingOrMalformedIds(): void
+    {
+        $this->dump('2026-10-01', self::id(100));
+        mkdir($this->root . '/outside');
+        file_put_contents($this->root . '/outside/keep.txt', 'x');
+
+        self::assertFalse($this->storage()->delete(self::id(999)));
+        self::assertFalse($this->storage()->delete('../outside'));
+        self::assertFalse($this->storage()->delete('..'));
+        self::assertFalse($this->storage()->delete(''));
+        self::assertFileExists($this->root . '/outside/keep.txt');
+        self::assertCount(1, $this->storage()->list());
+    }
+
+    public function testDeleteLeavesADumpThatIsStillBeingWritten(): void
+    {
+        $id = self::id(100);
+        $this->dump('2026-10-01', $id, summary: ''); // data.json, no summary.json yet
+
+        self::assertFalse($this->storage()->delete($id));
+        self::assertFileExists("$this->root/debug/2026-10-01/$id/data.json");
+    }
+
+    public function testDeleteNeverFollowsASymlinkOutOfTheDumpDirectory(): void
+    {
+        $target = $this->root . '/precious';
+        mkdir($target);
+        file_put_contents($target . '/summary.json', '{"summary":{}}');
+        file_put_contents($target . '/data.json', '{}');
+        mkdir($this->root . '/debug/2026-10-01');
+        $id = self::id(100);
+        symlink($target, "$this->root/debug/2026-10-01/$id");
+
+        self::assertFalse($this->storage()->delete($id));
+        self::assertSame(0, $this->storage()->clear());
+
+        self::assertFileExists($target . '/summary.json');
+        self::assertFileExists($target . '/data.json');
+    }
+
+    public function testDeleteRefusesAFolderThatHoldsSubfolders(): void
+    {
+        $id = self::id(100);
+        $this->dump('2026-10-01', $id);
+        mkdir("$this->root/debug/2026-10-01/$id/not-from-yii-debug");
+
+        self::assertFalse($this->storage()->delete($id));
+        self::assertDirectoryExists("$this->root/debug/2026-10-01/$id/not-from-yii-debug");
+    }
+
+    public function testClearRemovesEveryCompleteDumpAndOnlyThose(): void
+    {
+        $this->dump('2026-10-01', self::id(100));
+        $this->dump('2026-10-01', self::id(200));
+        $this->dump('2026-10-02', self::id(300));
+        $this->dump('2026-10-02', self::id(400), summary: ''); // still being written
+        file_put_contents($this->root . '/debug/.gitignore', '*');
+        file_put_contents($this->root . '/debug/2026-10-01/notes.txt', 'mine');
+        mkdir($this->root . '/debug/2026-10-03/not-a-dump', 0777, true);
+
+        self::assertSame(3, $this->storage()->clear());
+
+        self::assertSame([], $this->storage()->list());
+        self::assertFileExists($this->root . '/debug/.gitignore');
+        self::assertFileExists($this->root . '/debug/2026-10-01/notes.txt', 'a date folder with other content stays');
+        self::assertDirectoryExists($this->root . '/debug/2026-10-02/' . self::id(400), 'the unfinished dump stays');
+        self::assertDirectoryExists($this->root . '/debug/2026-10-03/not-a-dump');
+    }
+
+    public function testClearOnAnEmptyOrMissingDirectory(): void
+    {
+        self::assertSame(0, $this->storage()->clear());
+        self::assertSame(0, (new DumpStorage(new Aliases(['@runtime' => $this->root . '/nope'])))->clear());
+    }
 }

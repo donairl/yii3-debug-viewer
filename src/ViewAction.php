@@ -9,6 +9,11 @@ use Psr\Http\Message\ServerRequestInterface;
 use Yiisoft\Router\CurrentRoute;
 use Yiisoft\Router\UrlGeneratorInterface;
 
+use function parse_url;
+use function rtrim;
+
+use const PHP_URL_PATH;
+
 /**
  * One collected request: SQL, logs, exceptions, route, events.
  */
@@ -20,7 +25,9 @@ final readonly class ViewAction
         private CurrentRoute $currentRoute,
         private EditorLinker $editor,
         private UrlGeneratorInterface $urlGenerator,
+        private Csrf $csrf,
         private bool $enabled = false,
+        private bool $allowDelete = true,
     ) {}
 
     public function __invoke(ServerRequestInterface $request): ResponseInterface
@@ -48,7 +55,9 @@ final readonly class ViewAction
         // An export carries over what this page shows: masked, or revealed
         $exportQuery = $redaction['revealed'] ? ['reveal' => '1'] : [];
 
-        return $this->template->html('view', DumpPage::params($dump, $this->editor) + [
+        ['token' => $token, 'isNew' => $isNew] = $this->csrf->token($request);
+
+        $response = $this->template->html('view', DumpPage::params($dump, $this->editor) + [
             'indexUrl' => $indexUrl,
             'redaction' => $redaction + [
                 'toggleUrl' => $redaction['enabled']
@@ -59,6 +68,13 @@ final readonly class ViewAction
                 'json' => $this->urlGenerator->generate('debug.export', ['id' => $id], ['format' => 'json'] + $exportQuery),
                 'html' => $this->urlGenerator->generate('debug.export', ['id' => $id], ['format' => 'html'] + $exportQuery),
             ],
+            'canDelete' => $this->allowDelete,
+            'csrf' => $token,
+            'deleteUrl' => $this->urlGenerator->generate('debug.delete', ['id' => $id]),
         ]);
+
+        return $isNew && $this->allowDelete
+            ? $response->withAddedHeader('Set-Cookie', $this->csrf->cookie($token, rtrim((string)parse_url($indexUrl, PHP_URL_PATH), '/'), $request->getUri()->getScheme() === 'https'))
+            : $response;
     }
 }
