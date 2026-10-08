@@ -149,6 +149,23 @@ a multipart upload stays visible. Add names with `redactKeys`, and turn the
 whole thing off with `'redact' => false`. The request list shows no request
 data, so it is unaffected.
 
+### Export
+
+The request page has **Export JSON** and **Export HTML** links, for attaching
+a request to an issue. They go through the same masking as the page, so
+credentials are masked unless you exported from a revealed view (`?reveal=1`),
+in which case the file says it carries real values.
+
+- JSON: `{generator, exportedAt, id, redaction, warning, meta, summary, data}`,
+  where `data` is the collector data as the viewer reads it.
+- HTML: the request page as one self-contained file (inline CSS and script, no
+  external requests), with a banner stating when it was exported. All tabs
+  work offline; links back to the live viewer are left out.
+
+The URLs are `<prefix>/<id>/export?format=json|html[&reveal=1]`. They come
+with `Routes::create()`, so an application that already spreads those routes
+gets the new one on update.
+
 ### Open in editor
 
 With `editor` set, every `file:line` the viewer shows (query callers, log

@@ -191,6 +191,30 @@ final class RedactorTest extends TestCase
         self::assertSame($data[DumpView::SERVICE], $out[DumpView::SERVICE], 'nothing sensitive, nothing changed');
     }
 
+    public function testUrlsWithSecretsAreMaskedWhereverTheySit(): void
+    {
+        $r = new Redactor();
+        $summary = [DumpView::REQUEST => ['request' => ['url' => 'http://a.test/login?token=SECRET1&page=2', 'path' => '/login']]];
+        $http = ['Yiisoft\\Yii\\Debug\\Collector\\HttpClientCollector' => [['uri' => 'https://api.example/v1/x?api_key=SECRET2', 'method' => 'GET']]];
+
+        [$out, $count] = $r->dump($summary + $http);
+
+        self::assertSame('http://a.test/login?token=%5BREDACTED%5D&page=2', $out[DumpView::REQUEST]['request']['url']);
+        self::assertSame('/login', $out[DumpView::REQUEST]['request']['path']);
+        self::assertSame('https://api.example/v1/x?api_key=%5BREDACTED%5D', array_values($out)[1][0]['uri']);
+        self::assertSame(2, $count);
+    }
+
+    public function testQuestionMarksInOrdinaryTextAreLeftAlone(): void
+    {
+        $data = ['C' => ['message' => 'Is the token valid? yes', 'note' => 'see /docs?', 'q' => 'a ? b', 'url' => 'http://a.test/x?page=2']];
+
+        [$out, $count] = (new Redactor())->dump($data);
+
+        self::assertSame($data, $out);
+        self::assertSame(0, $count);
+    }
+
     public function testNothingToMaskReturnsTheSameDumpAndZero(): void
     {
         $data = [DumpView::LOG => [['level' => 'info', 'message' => 'hello', 'time' => 1.0]], DumpView::DB => ['queries' => []], 'Other' => 'scalar'];

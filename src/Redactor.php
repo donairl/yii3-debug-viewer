@@ -432,13 +432,20 @@ final class Redactor
     }
 
     /**
-     * A string leaf: bearer tokens everywhere, `password=...` fragments in
-     * message-like fields, and the values of JSON-looking strings.
+     * A string leaf: URLs with a query string, bearer tokens everywhere,
+     * `password=...` fragments in message-like fields, and the values of
+     * JSON-looking strings.
      */
     private function text(string $text, bool $isMessage): string
     {
         if ($text === '') {
             return $text;
+        }
+
+        // A string that is a whole URL or request target with a query string, wherever it sits
+        // (summaries, HTTP client calls, ...): `https://api/x?key=...`, `/login?token=...`
+        if (str_contains($text, '?') && preg_match('#^(?:https?://|/)\S*\?\S*$#', $text) === 1) {
+            $text = $this->url($text);
         }
 
         if (str_contains($text, 'Bearer ') || str_contains($text, 'Basic ')) {

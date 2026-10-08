@@ -16,6 +16,8 @@ use Dxn\DebugViewer\Template;
  * @var EditorLinker $editor
  * @var string|null $warning
  * @var array{enabled: bool, revealed: bool, masked: int, toggleUrl: string}|null $redaction
+ * @var array{at: string}|null $export Set when this page is written out as a snapshot file.
+ * @var array{json: string, html: string}|null $exportUrls
  * @var string $indexUrl
  */
 
@@ -57,6 +59,8 @@ $timeline = $view->timeline();
 $problems = ProblemFinder::find($view, $meta);
 $curlSafe = CurlCommand::fromView($view, true);
 $curlFull = $curlSafe === null ? null : CurlCommand::fromView($view, false);
+$export ??= null;
+$exportUrls ??= null;
 $redaction ??= ['enabled' => false, 'revealed' => false, 'masked' => 0, 'toggleUrl' => ''];
 $maskedInView = $redaction['enabled'] && !$redaction['revealed'] && $redaction['masked'] > 0;
 $curlHasSecrets = $curlSafe !== null && $curlFull !== null && $curlSafe['command'] !== $curlFull['command'];
@@ -131,14 +135,16 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
     <!-- Breadcrumb & ID -->
     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 12.5px; color: var(--text-muted);">
-            <a href="<?= Template::e($indexUrl) ?>" style="color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.3rem;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                <span>Requests</span>
-            </a>
-            <span>/</span>
+            <?php if ($export === null) { ?>
+                <a href="<?= Template::e($indexUrl) ?>" style="color: var(--text-muted); display: inline-flex; align-items: center; gap: 0.3rem;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    <span>Requests</span>
+                </a>
+                <span>/</span>
+            <?php } ?>
             <span style="color: var(--text-secondary); font-family: var(--font-mono); font-weight: 500;">
                 <?= Template::e($id) ?>
             </span>
@@ -156,6 +162,14 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
             </span>
             <span>&middot;</span>
             <span><?= Template::e(Template::timeAgo($time)) ?></span>
+            <?php if ($export === null && $exportUrls !== null) { ?>
+                <span>&middot;</span>
+                <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span>Export</span>
+                    <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['json']) ?>" download title="The request data as one JSON file">JSON</a>
+                    <a class="dash-btn" style="padding: 2px 9px; font-size: 11.5px;" href="<?= Template::e($exportUrls['html']) ?>" download title="This page as one self-contained HTML file">HTML</a>
+                </span>
+            <?php } ?>
         </div>
     </div>
 
@@ -208,7 +222,20 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
     </div>
 <?php } ?>
 
-<?php if ($maskedInView) { ?>
+<?php if ($export !== null) { ?>
+    <div class="redaction-note <?= $redaction['enabled'] && !$redaction['revealed'] ? '' : 'redaction-note-open' ?>">
+        <span>
+            <b>Snapshot</b> of request <code><?= Template::e($id) ?></code>, exported <?= Template::e($export['at']) ?>.
+            <?php if ($redaction['enabled'] && !$redaction['revealed']) { ?>
+                <?= (int)$redaction['masked'] ?> sensitive <?= $redaction['masked'] === 1 ? 'value is' : 'values are' ?> masked.
+            <?php } elseif ($redaction['enabled']) { ?>
+                It <b>includes the real sensitive values</b>: check it before you share it.
+            <?php } else { ?>
+                Sensitive values are <b>not masked</b> (redaction is off).
+            <?php } ?>
+        </span>
+    </div>
+<?php } elseif ($maskedInView) { ?>
     <div class="redaction-note">
         <span><b><?= (int)$redaction['masked'] ?></b> sensitive <?= $redaction['masked'] === 1 ? 'value is' : 'values are' ?> masked (passwords, tokens, cookies and similar).</span>
         <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a>
@@ -1131,7 +1158,7 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                         </div>
                     <?php } elseif ($maskedInView) { ?>
                         <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">
-                            Credentials are masked in this view. <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a> to get a command with the real values.
+                            Credentials are masked in this view.<?php if ($export === null) { ?> <a href="<?= Template::e($redaction['toggleUrl']) ?>">Show them</a> to get a command with the real values.<?php } ?>
                         </div>
                     <?php } else { ?>
                         <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">No credentials were found in this request.</div>

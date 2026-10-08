@@ -39,6 +39,9 @@ final class Routes
             Route::get($prefix . '/{id:[A-Za-z0-9]+}')
                 ->action(ViewAction::class)
                 ->name('debug.view'),
+            Route::get($prefix . '/{id:[A-Za-z0-9]+}/export')
+                ->action(ExportAction::class)
+                ->name('debug.export'),
         ];
     }
 }

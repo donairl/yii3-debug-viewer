@@ -45,6 +45,24 @@ final readonly class Template
         return $response->withHeader('Content-Type', 'text/html; charset=UTF-8');
     }
 
+    /**
+     * A file to save, not a page to show.
+     *
+     * @param string|null $filename Sent as an attachment when given.
+     */
+    public function download(string $body, string $contentType, ?string $filename = null, int $status = 200): ResponseInterface
+    {
+        $response = $this->responseFactory->createResponse($status);
+        $response->getBody()->write($body);
+        $response = $response
+            ->withHeader('Content-Type', $contentType)
+            ->withHeader('X-Content-Type-Options', 'nosniff');
+
+        return $filename === null
+            ? $response
+            : $response->withHeader('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
     private static function render(string $file, array $params): string
     {
         extract($params, EXTR_SKIP);

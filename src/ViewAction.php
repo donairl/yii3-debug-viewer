@@ -15,14 +15,12 @@ use Yiisoft\Router\UrlGeneratorInterface;
 final readonly class ViewAction
 {
     public function __construct(
-        private DumpStorage $storage,
+        private DumpReader $reader,
         private Template $template,
         private CurrentRoute $currentRoute,
         private EditorLinker $editor,
-        private Redactor $redactor,
         private UrlGeneratorInterface $urlGenerator,
         private bool $enabled = false,
-        private bool $redact = true,
     ) {}
 
     public function __invoke(ServerRequestInterface $request): ResponseInterface
@@ -33,7 +31,10 @@ final readonly class ViewAction
 
         $indexUrl = $this->urlGenerator->generate('debug.index');
         $id = (string)$this->currentRoute->getArgument('id');
-        $dump = $this->storage->get($id);
+
+        // `?reveal=1` shows the real values of this view (see DumpReader)
+        $reveal = ($request->getQueryParams()['reveal'] ?? '') === '1';
+        $dump = $this->reader->get($id, $reveal);
 
         if ($dump === null) {
             return $this->template->html('missing', [
@@ -43,36 +44,20 @@ final readonly class ViewAction
             ], 404);
         }
 
-        $data = $dump['data'];
-        $summary = $dump['summary'];
-        $meta = $dump['meta'];
+        $redaction = $dump['redaction'];
+        // An export carries over what this page shows: masked, or revealed
+        $exportQuery = $redaction['revealed'] ? ['reveal' => '1'] : [];
 
-        // Values are masked here, before anything is rendered, so they never reach the page.
-        // `?reveal=1` turns that off for this view.
-        $reveal = $this->redact && ($request->getQueryParams()['reveal'] ?? '') === '1';
-        $masked = 0;
-        if ($this->redact && !$reveal) {
-            [$data, $maskedData] = $this->redactor->dump($data);
-            [$summary, $maskedSummary] = $this->redactor->dump($summary);
-            $meta['url'] = $this->redactor->url((string)$meta['url']);
-            $masked = $maskedData + $maskedSummary;
-        }
-
-        return $this->template->html('view', [
-            'title' => $meta['method'] . ' ' . ($meta['path'] ?: '/'),
+        return $this->template->html('view', DumpPage::params($dump, $this->editor) + [
             'indexUrl' => $indexUrl,
-            'meta' => $meta,
-            'summary' => $summary,
-            'view' => new DumpView($data),
-            'editor' => $this->editor,
-            'warning' => $dump['warning'],
-            'redaction' => [
-                'enabled' => $this->redact,
-                'revealed' => $reveal,
-                'masked' => $masked,
-                'toggleUrl' => $this->redact
-                    ? $this->urlGenerator->generate('debug.view', ['id' => $id], $reveal ? [] : ['reveal' => '1'])
+            'redaction' => $redaction + [
+                'toggleUrl' => $redaction['enabled']
+                    ? $this->urlGenerator->generate('debug.view', ['id' => $id], $redaction['revealed'] ? [] : ['reveal' => '1'])
                     : '',
+            ],
+            'exportUrls' => [
+                'json' => $this->urlGenerator->generate('debug.export', ['id' => $id], ['format' => 'json'] + $exportQuery),
+                'html' => $this->urlGenerator->generate('debug.export', ['id' => $id], ['format' => 'html'] + $exportQuery),
             ],
         ]);
     }

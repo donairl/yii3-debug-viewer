@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dxn\DebugViewer\Tests;
 
+use Dxn\DebugViewer\DumpReader;
 use Dxn\DebugViewer\DumpStorage;
 use Dxn\DebugViewer\DumpView;
 use Dxn\DebugViewer\EditorLinker;
@@ -91,14 +92,12 @@ final class ViewActionTest extends TestCase
         $request->method('getQueryParams')->willReturn($query);
 
         $action = new ViewAction(
-            storage: new DumpStorage(new Aliases(['@runtime' => $this->root])),
+            reader: new DumpReader(new DumpStorage(new Aliases(['@runtime' => $this->root])), new Redactor(), $redact),
             template: new Template($factory),
             currentRoute: $route,
             editor: new EditorLinker(),
-            redactor: new Redactor(),
             urlGenerator: $urls,
             enabled: true,
-            redact: $redact,
         );
 
         $response = $action($request);
@@ -175,5 +174,17 @@ final class ViewActionTest extends TestCase
         foreach (['0', 'true', 'yes', '', '1 '] as $value) {
             self::assertStringNotContainsString('COOKIESECRET', $this->render(['reveal' => $value]), "reveal=$value");
         }
+    }
+
+    public function testExportLinksCarryTheRevealStateOfThePage(): void
+    {
+        $masked = $this->render();
+        $revealed = $this->render(['reveal' => '1']);
+
+        self::assertStringContainsString('href="/debug/' . self::ID . '?format=json"', $masked);
+        self::assertStringContainsString('href="/debug/' . self::ID . '?format=html"', $masked);
+        self::assertStringNotContainsString('format=json&amp;reveal=1', $masked, 'a masked page never links to a revealed export');
+        self::assertStringContainsString('format=json&amp;reveal=1', $revealed);
+        self::assertStringContainsString('format=html&amp;reveal=1', $revealed);
     }
 }

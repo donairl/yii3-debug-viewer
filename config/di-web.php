@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Dxn\DebugViewer\DumpReader;
 use Dxn\DebugViewer\DumpStorage;
 use Dxn\DebugViewer\EditorLinker;
+use Dxn\DebugViewer\ExportAction;
 use Dxn\DebugViewer\IndexAction;
 use Dxn\DebugViewer\Redactor;
 use Dxn\DebugViewer\Template;
@@ -26,6 +28,13 @@ return [
     ],
 
     Template::class => Template::class,
+
+    DumpReader::class => [
+        'class' => DumpReader::class,
+        '__construct()' => [
+            'redact' => (bool)($config['redact'] ?? true),
+        ],
+    ],
 
     Redactor::class => [
         'class' => Redactor::class,
@@ -54,7 +63,13 @@ return [
         'class' => ViewAction::class,
         '__construct()' => [
             'enabled' => (bool)$config['enabled'],
-            'redact' => (bool)($config['redact'] ?? true),
+        ],
+    ],
+
+    ExportAction::class => [
+        'class' => ExportAction::class,
+        '__construct()' => [
+            'enabled' => (bool)$config['enabled'],
         ],
     ],
 ];

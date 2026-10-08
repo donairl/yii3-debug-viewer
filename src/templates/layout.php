@@ -11,7 +11,9 @@ use Dxn\DebugViewer\Template;
  * @var string|null $template
  * @var string|null $id
  * @var array<string, mixed>|null $meta
+ * @var array{at: string}|null $export Set when the page is written out as a snapshot file.
  */
+$export ??= null;
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -665,7 +667,7 @@ use Dxn\DebugViewer\Template;
 <body>
 <header class="dash-header">
     <div class="dash-brand">
-        <a href="<?= Template::e($indexUrl) ?>" style="display:flex;align-items:center;gap:0.65rem;color:inherit;text-decoration:none;">
+        <<?= $export === null ? 'a href="' . Template::e($indexUrl) . '"' : 'div' ?> style="display:flex;align-items:center;gap:0.65rem;color:inherit;text-decoration:none;">
             <div class="dash-logo-icon">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="m8 2 1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"></path>
@@ -677,11 +679,11 @@ use Dxn\DebugViewer\Template;
                 <span class="title-text">Yii3 Profiler</span>
                 <span class="dash-env-pill">DEV</span>
             </div>
-        </a>
+        </<?= $export === null ? 'a' : 'div' ?>>
     </div>
 
     <div class="dash-nav">
-        <?php if ($template === 'view') { ?>
+        <?php if ($template === 'view' && $export === null) { ?>
             <a href="<?= Template::e($indexUrl) ?>" class="dash-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="m15 18-6-6 6-6"></path>
@@ -690,6 +692,7 @@ use Dxn\DebugViewer\Template;
             </a>
         <?php } ?>
 
+        <?php if ($export === null) { ?>
         <button type="button" class="dash-btn dash-btn-icon" id="btn-refresh" title="Reload requests (R)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
@@ -698,6 +701,7 @@ use Dxn\DebugViewer\Template;
                 <path d="M16 21h5v-5"></path>
             </svg>
         </button>
+        <?php } ?>
 
         <button type="button" class="dash-btn dash-btn-icon" id="btn-theme-toggle" title="Toggle Dark / Light Theme">
             <svg id="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -709,6 +713,7 @@ use Dxn\DebugViewer\Template;
             </svg>
         </button>
 
+        <?php if ($export === null) { ?>
         <a href="/" class="dash-btn" title="Open Main Application">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -717,6 +722,7 @@ use Dxn\DebugViewer\Template;
             </svg>
             <span>App</span>
         </a>
+        <?php } ?>
     </div>
 </header>
 
