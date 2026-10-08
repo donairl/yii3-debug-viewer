@@ -117,6 +117,38 @@ final class ViewTemplateTest extends TestCase
         }
     }
 
+    private static function requestDump(string $cookie): array
+    {
+        $raw = "GET /a HTTP/1.1\r\nHost: app.test\r\n" . ($cookie !== '' ? "Cookie: $cookie\r\n" : '') . "\r\n";
+
+        return [DumpView::REQUEST => ['requestUrl' => 'http://app.test/a', 'requestMethod' => 'GET', 'requestRaw' => $raw]];
+    }
+
+    public function testRequestTabOffersAMaskedCurlCommandWithAnOptInForCredentials(): void
+    {
+        $html = self::render(self::requestDump('SESSID=topsecret'));
+
+        self::assertStringContainsString('Replay as cURL', $html);
+        self::assertStringContainsString('id="curl-secrets"', $html);
+        self::assertSame(1, substr_count($html, 'Cookie: SESSID=[REDACTED]'), 'the shown command is masked');
+        self::assertSame(1, preg_match('/<pre class="curl-cmd" id="curl-full" hidden[^>]*>[^<]*topsecret/', $html), 'the real one is there but hidden');
+    }
+
+    public function testNoCredentialToggleWhenThereAreNoCredentials(): void
+    {
+        $html = self::render(self::requestDump(''));
+
+        self::assertStringContainsString('Replay as cURL', $html);
+        self::assertStringNotContainsString('id="curl-secrets"', $html);
+        self::assertStringNotContainsString('id="curl-full"', $html);
+        self::assertStringContainsString('No credentials were found', $html);
+    }
+
+    public function testNoCurlPanelWithoutARequest(): void
+    {
+        self::assertStringNotContainsString('Replay as cURL', self::render([]));
+    }
+
     public function testNoFilterBarsWhenTabsAreEmpty(): void
     {
         $html = self::render([]);

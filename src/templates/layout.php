@@ -659,7 +659,7 @@ use Dxn\DebugViewer\Template;
         th[data-sort]::after { content: ' \2195'; opacity: 0.3; font-size: 10px; }
         th[data-sort][aria-sort="ascending"]::after { content: ' \25B2'; opacity: 1; color: var(--accent); }
         th[data-sort][aria-sort="descending"]::after { content: ' \25BC'; opacity: 1; color: var(--accent); }
-        tr[hidden] { display: none; }
+        [hidden] { display: none !important; }
     </style>
 </head>
 <body>

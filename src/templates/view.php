@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Dxn\DebugViewer\CurlCommand;
 use Dxn\DebugViewer\DumpView;
 use Dxn\DebugViewer\EditorLinker;
 use Dxn\DebugViewer\ExceptionTrace;
@@ -53,6 +54,9 @@ $insights = $view->queryInsights();
 $queryFlags = $insights['flags'];
 $timeline = $view->timeline();
 $problems = ProblemFinder::find($view, $meta);
+$curlSafe = CurlCommand::fromView($view, true);
+$curlFull = $curlSafe === null ? null : CurlCommand::fromView($view, false);
+$curlHasSecrets = $curlSafe !== null && $curlFull !== null && $curlSafe['command'] !== $curlFull['command'];
 
 /** Short, single-line form of a statement for headings. */
 $shorten = static fn(string $text, int $max = 140): string => mb_strimwidth((string)preg_replace('/\s+/', ' ', $text), 0, $max, '…');
@@ -1074,6 +1078,48 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
 <!-- 4. TAB: REQUEST / RESPONSE -->
 <div class="dash-tab-pane" id="pane-request">
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <?php if ($curlSafe !== null) { ?>
+            <!-- Replay as cURL -->
+            <div class="dash-panel" id="curl-panel">
+                <div class="dash-panel-header" style="flex-wrap: wrap;">
+                    <div class="dash-panel-title">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <span>Replay as cURL</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <?php if ($curlHasSecrets) { ?>
+                            <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
+                                <input type="checkbox" id="curl-secrets"> Include credentials
+                            </label>
+                        <?php } ?>
+                        <button type="button" class="dash-btn" id="curl-copy">Copy command</button>
+                    </div>
+                </div>
+                <div style="padding: 1rem 1.25rem;">
+                    <pre class="curl-cmd" id="curl-safe" style="margin: 0; white-space: pre-wrap; word-break: break-all;"><?= Template::e($curlSafe['command']) ?></pre>
+                    <?php if ($curlHasSecrets) { ?>
+                        <pre class="curl-cmd" id="curl-full" hidden style="margin: 0; white-space: pre-wrap; word-break: break-all;"><?= Template::e($curlFull['command']) ?></pre>
+                        <div id="curl-warn" hidden class="text-muted" style="margin-top: 0.6rem; font-size: 12px; color: var(--c-warn);">
+                            This command contains real cookies, tokens or passwords. Do not paste it into an issue or a chat.
+                        </div>
+                    <?php } else { ?>
+                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">No credentials were found in this request.</div>
+                    <?php } ?>
+                    <?php foreach (array_unique(array_merge($curlSafe['notes'], $curlFull['notes'] ?? [])) as $note) { ?>
+                        <div class="text-muted" style="margin-top: 0.4rem; font-size: 12px;">&bull; <?= Template::e($note) ?></div>
+                    <?php } ?>
+                    <?php if ($curlHasSecrets) { ?>
+                        <div class="text-muted" style="margin-top: 0.6rem; font-size: 12px;">
+                            Credentials are masked as <code>[REDACTED]</code>: replace them, or tick the box to include the real values.
+                        </div>
+                    <?php } ?>
+                </div>
+            </div>
+        <?php } ?>
+
         <!-- Request Section -->
         <div class="dash-panel">
             <div class="dash-panel-header">
@@ -1594,6 +1640,25 @@ $renderInsights = static function () use ($insights, $shorten, $locationHtml): v
                 box.select();
             }
         });
+
+        // cURL replay: copy what is shown, optionally with the real credentials
+        var curlSecrets = document.getElementById('curl-secrets');
+        var curlSafeEl = document.getElementById('curl-safe');
+        var curlFullEl = document.getElementById('curl-full');
+        if (curlSecrets && curlSafeEl && curlFullEl) {
+            curlSecrets.addEventListener('change', function() {
+                curlSafeEl.hidden = this.checked;
+                curlFullEl.hidden = !this.checked;
+                document.getElementById('curl-warn').hidden = !this.checked;
+            });
+        }
+        var curlCopy = document.getElementById('curl-copy');
+        if (curlCopy) {
+            curlCopy.addEventListener('click', function() {
+                var shown = document.querySelector('.curl-cmd:not([hidden])');
+                if (shown) { copyToClipboard(shown.textContent, 'cURL command'); }
+            });
+        }
 
         // Raw collector switcher
         var colSelect = document.getElementById('collector-select');

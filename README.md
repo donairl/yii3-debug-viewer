@@ -41,6 +41,14 @@ the raw collector summary. On top of that:
   there is nothing, it says so. The container probing for services it then
   autowires (`NotFoundException`) is ignored, since it happens on every
   request.
+- **Replay as cURL.** The Request tab rebuilds the recorded request as a
+  `curl` command you can paste into a shell: method, URL, headers and body,
+  quoted for POSIX shells. Credentials are masked by default (Authorization
+  and cookie values, `password`/`token`/`secret`/`api_key` style fields in
+  the URL, form body and JSON body) and a checkbox includes the real
+  values. Headers curl sets itself (`Host`, `Content-Length`,
+  `Accept-Encoding`) are dropped. Binary bodies are left out, and multipart
+  bodies are not masked, which the panel says.
 - **Stack traces.** Each exception (and its `previous` chain) is listed as
   frames with `file:line`. The throw site and your own code stay visible;
   runs of vendor frames fold away. "Copy trace" copies message and frames.
