@@ -38,11 +38,16 @@
         "yii-debug"
     ],
     "require-dev": {
-        "vimeo/psalm": "^6.0"
+        "vimeo/psalm": "^6.0",
+        "phpunit/phpunit": "^11.5",
+        "yiisoft/router-fastroute": "^4.0"
     },
     "autoload-dev": {
         "psr-4": {
             "Dxn\\DebugViewer\\Tests\\": "tests"
         }
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }

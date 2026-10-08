@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dxn\DebugViewer\DumpView;
+use Dxn\DebugViewer\ExceptionTrace;
 use Dxn\DebugViewer\Template;
 
 /**
@@ -42,6 +43,45 @@ foreach ($queries as $q) {
     }
 }
 $totalProblems = count($exceptions) + $queryErrors;
+
+$exceptionDetails = $view->exceptionDetails();
+$insights = $view->queryInsights();
+$queryFlags = $insights['flags'];
+$timeline = $view->timeline();
+
+/** Short, single-line form of a statement for headings. */
+$shorten = static fn(string $text, int $max = 140): string => mb_strimwidth((string)preg_replace('/\s+/', ' ', $text), 0, $max, '…');
+
+/** Query insight cards: shared by the Overview and Database tabs. */
+$renderInsights = static function () use ($insights, $shorten): void {
+    foreach ($insights['groups'] as $g) {
+        $isNPlusOne = $g['kind'] === 'n+1';
+        ?>
+        <div class="insight">
+            <div class="insight-head">
+                <span class="dash-badge badge-warning"><?= $isNPlusOne ? 'N+1 suspected' : 'Duplicate query' ?></span>
+                <span class="font-mono" style="font-size: 12px;">&times;<?= (int)$g['count'] ?></span>
+                <span class="text-muted font-mono" style="font-size: 12px;">
+                    <?= Template::e(Template::formatMs($g['totalMs'])) ?> total
+                    <?php if ($g['wastedMs'] > 0) { ?>
+                        &middot; ~<?= Template::e(Template::formatMs($g['wastedMs'])) ?> avoidable
+                    <?php } ?>
+                </span>
+                <button class="dash-btn" style="margin-left: auto;" data-goto-query="<?= (int)$g['indexes'][0] ?>">Show query &rarr;</button>
+            </div>
+            <div class="font-mono insight-sql"><?= Template::e($shorten($g['sql'])) ?></div>
+            <div class="text-muted" style="font-size: 12px;">
+                <?= $isNPlusOne
+                    ? 'Same statement run ' . (int)$g['count'] . ' times with different values. Load it once with a JOIN or <code>IN (...)</code>.'
+                    : 'Identical statement and values run ' . (int)$g['count'] . ' times. Reuse the first result.' ?>
+                <?php if ($g['caller'] !== '') { ?>
+                    <span class="font-mono">Caller: <?= Template::e($g['caller']) ?></span>
+                <?php } ?>
+            </div>
+        </div>
+        <?php
+    }
+};
 ?>
 
 <!-- View Top Info Bar -->
@@ -131,6 +171,16 @@ $totalProblems = count($exceptions) + $queryErrors;
         <span>Overview</span>
     </button>
 
+    <button class="dash-tab" data-tab="timeline">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="14" y2="6"></line>
+            <line x1="7" y1="12" x2="19" y2="12"></line>
+            <line x1="11" y1="18" x2="21" y2="18"></line>
+        </svg>
+        <span>Timeline</span>
+        <span class="tab-badge"><?= count($timeline['items']) ?></span>
+    </button>
+
     <button class="dash-tab" data-tab="sql">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
@@ -139,6 +189,9 @@ $totalProblems = count($exceptions) + $queryErrors;
         </svg>
         <span>Database</span>
         <span class="tab-badge <?= $queryErrors > 0 ? 'badge-err' : '' ?>"><?= count($queries) ?></span>
+        <?php if ($insights['groups'] !== []) { ?>
+            <span class="tab-badge badge-warn" title="N+1 or duplicate queries"><?= count($insights['groups']) ?>&#9888;</span>
+        <?php } ?>
     </button>
 
     <button class="dash-tab" data-tab="logs">
@@ -242,6 +295,127 @@ $totalProblems = count($exceptions) + $queryErrors;
         color: var(--c-err);
         border-color: var(--c-err-border);
     }
+    .tab-badge.badge-warn {
+        background: var(--c-warn-bg);
+        color: var(--c-warn);
+        border-color: var(--c-warn-border);
+    }
+
+    /* Query insights */
+    .insight {
+        padding: 0.85rem 1rem;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    .insight:last-child { border-bottom: none; }
+    .insight-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .insight-sql {
+        font-size: 12px;
+        color: var(--text-primary);
+        background: var(--code-bg);
+        border: 1px solid var(--code-border);
+        border-radius: var(--radius-sm);
+        padding: 0.4rem 0.6rem;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    .query-flagged { border-color: var(--c-warn-border) !important; }
+    .query-flash { animation: queryFlash 1.4s ease; }
+    @keyframes queryFlash {
+        0%, 40% { box-shadow: 0 0 0 3px var(--accent-glow); }
+        100% { box-shadow: none; }
+    }
+
+    /* Stack traces */
+    .trace-frame {
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.4rem 1rem;
+        border-top: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 12px;
+    }
+    .trace-frame.is-app { background: var(--c-info-bg); }
+    .trace-frame.is-vendor { color: var(--text-muted); }
+    .trace-idx { width: 2.2rem; flex: none; color: var(--text-muted); text-align: right; }
+    .trace-call { color: var(--text-primary); word-break: break-all; }
+    .trace-frame.is-vendor .trace-call { color: var(--text-secondary); }
+    .trace-loc { color: var(--text-muted); word-break: break-all; }
+    .trace-frame.is-throw .trace-call { color: var(--c-err); font-weight: 700; }
+    .trace-fold > summary {
+        cursor: pointer;
+        padding: 0.4rem 1rem;
+        border-top: 1px solid var(--border-subtle);
+        font-size: 11.5px;
+        color: var(--text-muted);
+        background: var(--bg-surface-subtle);
+    }
+
+    /* Timeline waterfall */
+    .tl-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .tl-chip {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-surface);
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+    .tl-chip.off { opacity: 0.45; text-decoration: line-through; }
+    .tl-row {
+        display: grid;
+        grid-template-columns: minmax(180px, 34%) 1fr 130px;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 3px 1rem;
+        border-top: 1px solid var(--border-subtle);
+        min-height: 26px;
+    }
+    .tl-row[data-goto-query] { cursor: pointer; }
+    .tl-row[data-goto-query]:hover { background: var(--bg-surface-subtle); }
+    .tl-label {
+        display: flex; align-items: center; gap: 0.5rem;
+        font-family: var(--font-mono); font-size: 11.5px;
+        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        min-width: 0;
+    }
+    .tl-label > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+    .tl-type {
+        flex: none; width: 3.4rem; text-align: center;
+        font-family: var(--font-sans); font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+        text-transform: uppercase; border-radius: 4px; padding: 1px 0;
+        background: var(--bg-surface); color: var(--text-muted); border: 1px solid var(--border-subtle);
+    }
+    .tl-track {
+        position: relative; height: 14px;
+        background: linear-gradient(to right, var(--border-subtle) 1px, transparent 1px) 0 0 / 25% 100%;
+        border-right: 1px solid var(--border-subtle);
+    }
+    .tl-bar, .tl-dot { position: absolute; top: 3px; background: var(--accent); }
+    .tl-bar { height: 8px; border-radius: 2px; min-width: 2px; }
+    .tl-dot { width: 8px; height: 8px; margin-left: -4px; transform: rotate(45deg); }
+    .tl-q .tl-bar { background: var(--c-info); }
+    .tl-s .tl-bar { background: var(--text-muted); }
+    .tl-e .tl-dot { background: var(--text-muted); }
+    .tl-l .tl-dot { background: var(--c-ok); }
+    .tl-l.tl-warn .tl-dot { background: var(--c-warn); }
+    .tl-x .tl-dot, .tl-err .tl-bar, .tl-err .tl-dot { background: var(--c-err); }
+    .tl-flag .tl-bar { background: var(--c-warn); }
+    .tl-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-align: right; white-space: nowrap; }
+    .tl-ruler .tl-track { background: none; border: none; height: 18px; }
+    .tl-ruler .tl-tick { position: absolute; white-space: nowrap; top: 0; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); transform: translateX(-50%); }
+    .tl-ruler .tl-tick:first-child { transform: none; }
+    .tl-ruler .tl-tick:last-child { transform: translateX(-100%); }
+    .tl-ruler { border-top: none; }
+    @media (max-width: 720px) {
+        .tl-row { grid-template-columns: 1fr; gap: 2px; }
+        .tl-time { text-align: left; }
+    }
+
     .dash-tab-pane {
         display: none;
     }
@@ -257,6 +431,42 @@ $totalProblems = count($exceptions) + $queryErrors;
 
 <!-- 1. TAB: OVERVIEW -->
 <div class="dash-tab-pane active" id="pane-overview">
+    <?php if ($exceptionDetails !== []) { ?>
+        <?php $first = $exceptionDetails[0]; ?>
+        <div class="dash-panel" style="border-color: var(--c-err-border); margin-bottom: 1.25rem;">
+            <div class="dash-panel-header" style="background: var(--c-err-bg); border-color: var(--c-err-border);">
+                <div class="dash-panel-title" style="color: var(--c-err);">
+                    <span><?= Template::e($first['class']) ?></span>
+                    <?php if (count($exceptionDetails) > 1) { ?>
+                        <span class="dash-badge badge-danger">+<?= count($exceptionDetails) - 1 ?> previous</span>
+                    <?php } ?>
+                </div>
+                <button class="dash-btn" onclick="document.querySelector('.dash-tab[data-tab=logs]').click();">View stack trace &rarr;</button>
+            </div>
+            <div style="padding: 0.85rem 1rem;">
+                <div style="font-weight: 600; color: var(--text-primary);"><?= Template::e($first['message']) ?></div>
+                <?php if ($first['file'] !== '') { ?>
+                    <div class="font-mono text-muted" style="font-size: 12px; margin-top: 0.3rem;"><?= Template::e($first['file']) ?>:<?= Template::e($first['line']) ?></div>
+                <?php } ?>
+            </div>
+        </div>
+    <?php } ?>
+
+    <?php if ($insights['groups'] !== []) { ?>
+        <div class="dash-panel" style="border-color: var(--c-warn-border); margin-bottom: 1.25rem;">
+            <div class="dash-panel-header">
+                <div class="dash-panel-title">
+                    <span>Query insights</span>
+                    <span class="dash-badge badge-warning"><?= count($insights['groups']) ?></span>
+                    <?php if ($insights['wastedMs'] > 0) { ?>
+                        <span class="text-muted" style="font-size: 12px; font-weight: 400;">~<?= Template::e(Template::formatMs($insights['wastedMs'])) ?> avoidable</span>
+                    <?php } ?>
+                </div>
+            </div>
+            <?php $renderInsights(); ?>
+        </div>
+    <?php } ?>
+
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
         <!-- Request & Client Card -->
         <div class="dash-panel">
@@ -417,6 +627,87 @@ $totalProblems = count($exceptions) + $queryErrors;
     <?php } ?>
 </div>
 
+<!-- 1b. TAB: TIMELINE -->
+<div class="dash-tab-pane" id="pane-timeline">
+    <?php if ($timeline['items'] === []) { ?>
+        <div class="dash-panel" style="padding: 3rem; text-align: center;">
+            <p style="color: var(--text-muted);">No timed activity was recorded for this request.</p>
+        </div>
+    <?php } else { ?>
+        <?php
+        $totalMs = (float)$timeline['totalMs'];
+        $typeNames = ['query' => 'SQL', 'service' => 'Service', 'event' => 'Event', 'log' => 'Log', 'exception' => 'Error'];
+        $typeClass = ['query' => 'tl-q', 'service' => 'tl-s', 'event' => 'tl-e', 'log' => 'tl-l', 'exception' => 'tl-x'];
+        $pct = static fn(float $ms): float => $totalMs > 0 ? min(100.0, max(0.0, $ms / $totalMs * 100)) : 0.0;
+        ?>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">
+                Request timeline
+                <span class="text-muted" style="font-size: 12px; font-weight: 400;">
+                    (<?= Template::e(Template::formatMs($totalMs)) ?><?= $timeline['hiddenServices'] > 0 ? ', ' . (int)$timeline['hiddenServices'] . ' sub-ms services hidden' : '' ?>)
+                </span>
+            </div>
+            <div class="tl-chips">
+                <?php foreach ($timeline['counts'] as $type => $n) { ?>
+                    <button type="button" class="tl-chip" data-tl-type="<?= Template::e($type) ?>">
+                        <?= Template::e($typeNames[$type] ?? $type) ?> <span class="font-mono"><?= (int)$n ?></span>
+                    </button>
+                <?php } ?>
+            </div>
+        </div>
+
+        <div class="dash-panel" style="overflow: hidden;">
+            <div class="tl-row tl-ruler">
+                <div></div>
+                <div class="tl-track">
+                    <?php foreach ([0, 25, 50, 75, 100] as $tick) { ?>
+                        <span class="tl-tick" style="left: <?= $tick ?>%;"><?= Template::e(Template::formatMs($totalMs * $tick / 100)) ?></span>
+                    <?php } ?>
+                </div>
+                <div></div>
+            </div>
+            <?php foreach ($timeline['items'] as $item) { ?>
+                <?php
+                $left = $pct((float)$item['startMs']);
+                $isSpan = $item['durationMs'] !== null;
+                $width = $isSpan ? min(100.0 - $left, max($pct((float)$item['durationMs']), 0.3)) : 0.0;
+                $classes = [$typeClass[$item['type']] ?? ''];
+                if ($item['status'] === 'error') {
+                    $classes[] = 'tl-err';
+                } elseif ($item['status'] === 'warn') {
+                    $classes[] = 'tl-warn';
+                }
+                if ($item['flag'] !== null) {
+                    $classes[] = 'tl-flag';
+                }
+                $title = $item['label'] . ($item['detail'] !== '' ? "\n" . $item['detail'] : '')
+                    . ($item['flag'] !== null ? "\n" . strtoupper($item['flag']) . ' suspected' : '');
+                ?>
+                <div class="tl-row <?= Template::e(implode(' ', $classes)) ?>"
+                     data-type="<?= Template::e($item['type']) ?>"
+                     title="<?= Template::e($title) ?>"
+                     <?= $item['ref'] !== null ? 'data-goto-query="' . (int)$item['ref'] . '"' : '' ?>>
+                    <div class="tl-label">
+                        <span class="tl-type"><?= Template::e($typeNames[$item['type']] ?? $item['type']) ?></span>
+                        <span><?= Template::e($item['label']) ?></span>
+                    </div>
+                    <div class="tl-track">
+                        <?php if ($isSpan) { ?>
+                            <span class="tl-bar" style="left: <?= number_format($left, 3, '.', '') ?>%; width: <?= number_format($width, 3, '.', '') ?>%;"></span>
+                        <?php } else { ?>
+                            <span class="tl-dot" style="left: <?= number_format($left, 3, '.', '') ?>%;"></span>
+                        <?php } ?>
+                    </div>
+                    <div class="tl-time">
+                        +<?= Template::e(Template::formatMs((float)$item['startMs'])) ?>
+                        <?= $isSpan ? '&middot; ' . Template::e(Template::formatMs((float)$item['durationMs'])) : '' ?>
+                    </div>
+                </div>
+            <?php } ?>
+        </div>
+    <?php } ?>
+</div>
+
 <!-- 2. TAB: DATABASE (SQL) -->
 <div class="dash-tab-pane" id="pane-sql">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -429,6 +720,12 @@ $totalProblems = count($exceptions) + $queryErrors;
         </div>
     </div>
 
+    <?php if ($insights['groups'] !== []) { ?>
+        <div class="dash-panel" style="border-color: var(--c-warn-border); margin-bottom: 1rem;">
+            <?php $renderInsights(); ?>
+        </div>
+    <?php } ?>
+
     <?php if ($queries === []) { ?>
         <div class="dash-panel" style="padding: 3rem; text-align: center;">
             <p style="color: var(--text-muted);">No database queries were executed during this request.</p>
@@ -439,8 +736,9 @@ $totalProblems = count($exceptions) + $queryErrors;
                 <?php
                 $qDur = $query['durationMs'];
                 $qSql = (string)$query['sql'];
+                $qFlag = $queryFlags[$i] ?? null;
                 ?>
-                <div class="dash-panel">
+                <div class="dash-panel<?= $qFlag !== null ? ' query-flagged' : '' ?>" id="q-<?= $i ?>">
                     <div class="dash-panel-header" style="padding: 0.65rem 1rem;">
                         <div style="display: flex; align-items: center; gap: 0.6rem;">
                             <span style="font-family: var(--font-mono); font-weight: 700; font-size: 12px; color: var(--text-muted);">
@@ -449,6 +747,11 @@ $totalProblems = count($exceptions) + $queryErrors;
                             <span class="dash-badge <?= $query['status'] === 'success' ? 'badge-success' : 'badge-danger' ?>">
                                 <?= Template::e($query['status']) ?>
                             </span>
+                            <?php if ($qFlag !== null) { ?>
+                                <span class="dash-badge badge-warning" title="<?= $qFlag['kind'] === 'n+1' ? 'Same statement shape run with different values' : 'Identical statement run more than once' ?>">
+                                    <?= $qFlag['kind'] === 'n+1' ? 'N+1' : 'duplicate' ?> &times;<?= (int)$qFlag['count'] ?>
+                                </span>
+                            <?php } ?>
                             <?php if ($qDur !== null) { ?>
                                 <span class="dash-badge" style="color: <?= $qDur > 100 ? 'var(--c-err)' : ($qDur > 20 ? 'var(--c-warn)' : 'var(--text-secondary)') ?>;">
                                     <?= Template::e(number_format((float)$qDur, 2)) ?> ms
@@ -511,31 +814,68 @@ $totalProblems = count($exceptions) + $queryErrors;
 <!-- 3. TAB: LOGS & EXCEPTIONS -->
 <div class="dash-tab-pane" id="pane-logs">
     <!-- Exceptions Section -->
-    <?php if ($exceptions !== []) { ?>
+    <?php if ($exceptionDetails !== []) { ?>
         <div style="margin-bottom: 1.5rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
                 <span class="dash-badge badge-danger" style="font-size: 13px; padding: 4px 9px;">
-                    <?= count($exceptions) ?> Exceptions
+                    <?= count($exceptionDetails) ?> Exception<?= count($exceptionDetails) > 1 ? 's' : '' ?>
                 </span>
             </div>
-            <?php foreach ($exceptions as $ex) { ?>
+            <?php foreach ($exceptionDetails as $n => $ex) { ?>
+                <?php
+                $copyText = $ex['class'] . ': ' . $ex['message'] . "\n";
+                foreach ($ex['frames'] as $f) {
+                    $copyText .= '#' . $f['index'] . ' ' . ($f['file'] !== '' ? $f['file'] . ($f['line'] !== '' ? '(' . $f['line'] . ')' : '') . ': ' : '') . $f['call'] . "\n";
+                }
+                $segments = ExceptionTrace::segments($ex['frames']);
+                $renderFrame = static function (array $f) use ($ex): void {
+                    $isThrow = ExceptionTrace::isThrowSite($f);
+                    $cls = $isThrow ? 'is-throw' : ($f['vendor'] ? 'is-vendor' : 'is-app');
+                    ?>
+                    <div class="trace-frame <?= $cls ?>">
+                        <span class="trace-idx">#<?= (int)$f['index'] ?></span>
+                        <div>
+                            <div class="trace-call"><?= Template::e($isThrow ? $ex['class'] . ' ' . $f['call'] : $f['call']) ?></div>
+                            <?php if ($f['file'] !== '') { ?>
+                                <div class="trace-loc"><?= Template::e($f['file']) ?><?= $f['line'] !== '' ? ':' . Template::e($f['line']) : '' ?></div>
+                            <?php } ?>
+                        </div>
+                    </div>
+                    <?php
+                };
+                ?>
                 <div class="dash-panel" style="border-color: var(--c-err-border); margin-bottom: 1rem; background: var(--bg-card);">
                     <div class="dash-panel-header" style="background: var(--c-err-bg); border-color: var(--c-err-border);">
-                        <div style="font-weight: 700; color: var(--c-err); font-family: var(--font-mono);">
-                            <?= Template::e($ex['class'] ?? $ex['type'] ?? 'Exception') ?>
+                        <div style="font-weight: 700; color: var(--c-err); font-family: var(--font-mono); display: flex; align-items: center; gap: 0.5rem;">
+                            <span><?= Template::e($ex['class']) ?></span>
+                            <?php if ($n > 0) { ?>
+                                <span class="dash-badge">previous</span>
+                            <?php } ?>
+                            <?php if ($ex['code'] !== '' && $ex['code'] !== '0') { ?>
+                                <span class="dash-badge">code <?= Template::e($ex['code']) ?></span>
+                            <?php } ?>
                         </div>
+                        <button class="dash-btn" onclick="copyToClipboard(<?= Template::e(json_encode($copyText)) ?>, 'Stack trace')" title="Copy message and stack trace">
+                            <span>Copy trace</span>
+                        </button>
                     </div>
                     <div style="padding: 1rem;">
-                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-                            <?= Template::e($ex['message'] ?? 'No message') ?>
-                        </div>
-                        <?php if (isset($ex['file'])) { ?>
-                            <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-bottom: 0.75rem;">
-                                <?= Template::e($ex['file']) ?>:<?= Template::e($ex['line'] ?? '') ?>
-                            </div>
-                        <?php } ?>
-                        <pre style="max-height: 400px;"><?= Template::e(DumpView::json($ex)) ?></pre>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: pre-wrap; word-break: break-word;"><?= Template::e($ex['message'] !== '' ? $ex['message'] : 'No message') ?></div>
                     </div>
+                    <?php foreach ($segments as $seg) { ?>
+                        <?php if ($seg['vendor'] && count($seg['frames']) > 1) { ?>
+                            <details class="trace-fold">
+                                <summary><?= count($seg['frames']) ?> vendor frames (#<?= (int)$seg['frames'][0]['index'] ?>&ndash;#<?= (int)$seg['frames'][count($seg['frames']) - 1]['index'] ?>)</summary>
+                                <?php foreach ($seg['frames'] as $f) { $renderFrame($f); } ?>
+                            </details>
+                        <?php } else { ?>
+                            <?php foreach ($seg['frames'] as $f) { $renderFrame($f); } ?>
+                        <?php } ?>
+                    <?php } ?>
+                    <details class="trace-fold">
+                        <summary>Raw exception data</summary>
+                        <pre style="max-height: 400px; margin: 0;"><?= Template::e(DumpView::json($exceptions[$n] ?? [])) ?></pre>
+                    </details>
                 </div>
             <?php } ?>
         </div>
@@ -974,6 +1314,34 @@ $totalProblems = count($exceptions) + $queryErrors;
         if (hash && document.getElementById('pane-' + hash)) {
             activateTab(hash);
         }
+
+        // Jump to a query in the Database tab (timeline rows, insight cards)
+        document.querySelectorAll('[data-goto-query]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                activateTab('sql');
+                var target = document.getElementById('q-' + this.getAttribute('data-goto-query'));
+                if (target) {
+                    target.scrollIntoView({ block: 'center' });
+                    target.classList.remove('query-flash');
+                    void target.offsetWidth;
+                    target.classList.add('query-flash');
+                }
+            });
+        });
+
+        // Timeline type filter
+        document.querySelectorAll('.tl-chip').forEach(function(chip) {
+            chip.addEventListener('click', function() {
+                this.classList.toggle('off');
+                var hidden = {};
+                document.querySelectorAll('.tl-chip.off').forEach(function(c) {
+                    hidden[c.getAttribute('data-tl-type')] = true;
+                });
+                document.querySelectorAll('.tl-row[data-type]').forEach(function(row) {
+                    row.style.display = hidden[row.getAttribute('data-type')] ? 'none' : '';
+                });
+            });
+        });
 
         // Raw collector switcher
         var colSelect = document.getElementById('collector-select');

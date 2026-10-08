@@ -21,7 +21,18 @@ so it stays fast with many dumps.
 
 Detail: SQL queries with parameters substituted and the calling `file:line`,
 log entries by level, exceptions, matched route, request/response, events and
-the raw collector summary.
+the raw collector summary. On top of that:
+
+- **Stack traces.** Each exception (and its `previous` chain) is listed as
+  frames with `file:line`. The throw site and your own code stay visible;
+  runs of vendor frames fold away. "Copy trace" copies message and frames.
+- **Query insights.** N+1 (the same statement shape run 3+ times with
+  different values) and duplicate queries (identical statement and values
+  run again) are flagged on the Overview and Database tabs, with the time
+  that could be saved and the calling line.
+- **Timeline.** SQL, container services, events, log entries and exceptions
+  on one time axis. Filter by type; click a query to jump to it. Services
+  faster than 0.5 ms are counted, not listed.
 
 ## Install
 
@@ -115,6 +126,12 @@ composer install --no-dev                  # runtime deps only, for deployment
 composer install --no-interaction --prefer-dist   # CI
 composer update                            # re-resolve and rewrite composer.lock
 composer dump-autoload                      # regenerate the autoloader only
+```
+
+Tests:
+
+```bash
+composer test
 ```
 
 Static analysis:

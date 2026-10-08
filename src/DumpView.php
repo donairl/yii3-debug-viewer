@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Dxn\DebugViewer;
 
+use function array_map;
 use function count;
 use function is_array;
+use function is_numeric;
 use function is_scalar;
 use function max;
 use function min;
@@ -49,6 +51,8 @@ final class DumpView
                 continue;
             }
 
+            $window = self::window($query['actions'] ?? []);
+
             $rows[] = [
                 'position' => (int)($query['position'] ?? 0),
                 'status' => (string)($query['status'] ?? 'unknown'),
@@ -56,6 +60,8 @@ final class DumpView
                 'line' => (string)($query['line'] ?? ''),
                 'rows' => $query['rowsNumber'] ?? null,
                 'durationMs' => self::duration($query['actions'] ?? []),
+                'start' => $window[0] ?? null,
+                'end' => $window[1] ?? null,
                 'params' => is_array($query['params'] ?? null) ? $query['params'] : [],
             ];
         }
@@ -112,6 +118,79 @@ final class DumpView
     public function exceptions(): array
     {
         return array_values(array_filter($this->collector(self::EXCEPTION), 'is_array'));
+    }
+
+    /**
+     * Exceptions as frames ready to render, outermost first, then each
+     * `previous` in the chain.
+     *
+     * @return list<array{
+     *     class: string,
+     *     message: string,
+     *     code: string,
+     *     file: string,
+     *     line: string,
+     *     frames: list<array{index: int, file: string, line: string, call: string, vendor: bool}>,
+     *     traceAsString: string
+     * }>
+     */
+    public function exceptionDetails(): array
+    {
+        return array_map(ExceptionTrace::describe(...), $this->exceptions());
+    }
+
+    /**
+     * N+1 and duplicate query findings.
+     *
+     * @see QueryAnalyzer::analyze()
+     */
+    public function queryInsights(): array
+    {
+        return QueryAnalyzer::analyze($this->queries());
+    }
+
+    /**
+     * @see Timeline::build()
+     */
+    public function timeline(): array
+    {
+        return Timeline::build($this);
+    }
+
+    /**
+     * When exceptions were reported, from the timeline collector.
+     *
+     * @return list<float>
+     */
+    public function exceptionTimes(): array
+    {
+        $times = [];
+        foreach ($this->collector(self::TIMELINE) as $entry) {
+            if (is_array($entry) && ($entry[2] ?? null) === self::EXCEPTION && isset($entry[0]) && is_numeric($entry[0])) {
+                $times[] = (float)$entry[0];
+            }
+        }
+
+        return $times;
+    }
+
+    /**
+     * Unix timestamps of the request start and end, when the app info
+     * collector recorded them.
+     *
+     * @return array{0: float, 1: float}|null
+     */
+    public function requestWindow(): ?array
+    {
+        $info = $this->appInfo();
+        $start = $info['preloadTime'] ?? null;
+        $end = $info['applicationProcessingTime'] ?? null;
+
+        if (!is_numeric($start) || !is_numeric($end) || (float)$end < (float)$start || (float)$start < 1.0E9) {
+            return null;
+        }
+
+        return [(float)$start, (float)$end];
     }
 
     public function request(): array
@@ -344,6 +423,27 @@ final class DumpView
         }
 
         return (max($times) - min($times)) * 1000;
+    }
+
+    /**
+     * First and last recorded action time of a query, as Unix timestamps.
+     *
+     * @return array{0: float, 1: float}|null
+     */
+    private static function window(mixed $actions): ?array
+    {
+        if (!is_array($actions)) {
+            return null;
+        }
+
+        $times = [];
+        foreach ($actions as $action) {
+            if (is_array($action) && isset($action['time'])) {
+                $times[] = (float)$action['time'];
+            }
+        }
+
+        return $times === [] ? null : [min($times), max($times)];
     }
 
     /**
